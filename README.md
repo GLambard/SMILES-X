@@ -21,7 +21,6 @@ With the SMILES-X, you can:
 * Use the following basic import to your jupyter notebook
 ```python
 import pandas as pd
-
 import SMILESX_utils
 %matplotlib inline
 ```
