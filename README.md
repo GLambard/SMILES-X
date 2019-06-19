@@ -11,9 +11,9 @@ The SMILES-X is dedicated to **small datasets (<5000 samples) of (SMILES, experi
 
 ## What can I do with it?
 With the SMILES-X, you can:
-* **Find best architectures** fitted to your small dataset via a Bayesian optimization.
-* **Predict molecular properties** of a list of SMILES based on models ensembling.
-* **Interpret** a prediction by visualizing the salient elements and/or substructures most related to an inferred property
+* **Design best architectures** fitted to your small dataset via a Bayesian optimization.
+* **Predict molecular properties** of a list of SMILES based on designed models ensembling **without human-engineered descriptors**.
+* **Interpret a prediction** by visualizing the salient elements and/or substructures most related to a property
 
 ## Usage
 
@@ -27,7 +27,7 @@ import SMILESX_utils
 
 ### How to find the best architectures fitted to my dataset?
 * After basic libraries import, unfold your dataset
-```python
+```
 validation_data_dir = "../validation_data/"
 extension = '.csv'
 data_name = 'FreeSolv' # FreeSolv, ESOL, Lipophilicity or your own dataset
