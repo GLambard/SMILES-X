@@ -26,7 +26,7 @@ import SMILESX_utils
 ```
 
 ### How to find the best architectures fitted to my dataset?
-1. After basic libraries import, unfold your dataset
+* After basic libraries import, unfold your dataset
 ```python
 validation_data_dir = "../validation_data/"
 extension = '.csv'
@@ -38,7 +38,7 @@ sol_data = sol_data[['smiles',prop_tag]] # reduce the data to (SMILES, property)
 # If the column containing the SMILES has a different name, feel free to change it accordingly
 ```
 
-2. Define architectural hyper-parameters bounds to be used for the neural architecture search
+* Define architectural hyper-parameters bounds to be used for the neural architecture search
 ```python
 dhyp_range = [int(2**itn) for itn in range(3,11)] # 
 dalpha_range = [float(ialpha/10.) for ialpha in range(20,40,1)] # Adam's learning rate = 10^(-dalpha_range)
@@ -53,7 +53,7 @@ bounds = [
 ```
 These bounds are used in the paper, but they can be tuned according to your dataset
 
-3. Let the SMILES-X find the best architectures for the most accurate property predictions
+* Let the SMILES-X find the best architectures for the most accurate property predictions
 ```python
 SMILESX_utils.Main(data=sol_data,        # provided data (SMILES, property)
                    data_name=data_name,  # dataset's name
@@ -72,7 +72,7 @@ SMILESX_utils.Main(data=sol_data,        # provided data (SMILES, property)
 Please refer to the **`SMILESX_utils.py`** for a detailed review of the options 
 
 ### How to infer a property on new data (SMILES)?
-1. Just use
+* Just use
 ```python
 pred_from_ens = SMILESX_utils.Inference(data_name=data_name, 
                                         smiles_list = ['CC','CCC','C=O'], # new list of SMILES to characterize
@@ -85,7 +85,7 @@ pred_from_ens = SMILESX_utils.Inference(data_name=data_name,
 It returns a table of SMILES with their inferred property (mean, standard deviation) determined by models ensembling
 
 ### How to interpret a prediction?
-1. Just use
+* Just use
 ```python
 SMILESX_utils.Interpretation(data=sol_data, 
                              data_name=data_name, 
@@ -100,13 +100,13 @@ SMILESX_utils.Interpretation(data=sol_data,
 ```
 
 Returns:
-1. 1D attention map on individual tokens
+* **1D attention map on individual tokens**
 ![1d_attention_map](/images/Interpretation_1D_FreeSolv_SAMPL_seed_17730.png)
 
-2. 2D attention map on individual vertices and edges
+* **2D attention map on individual vertices and edges**
 ![2d_attention_map](/images/Interpretation_2D_FreeSolv_SAMPL_seed_17730.png)
 
-3. Temporal relative distance to the final prediction, or evolution of the inference with sequential addition of tokens along a SMILES
+* **Temporal relative distance to the final prediction**, or evolution of the inference with sequential addition of tokens along a SMILES
 ![temporal_map](/images/Interpretation_temporal_FreeSolv_SAMPL_seed_17730.png)
 
 Please refer to the article for further details
