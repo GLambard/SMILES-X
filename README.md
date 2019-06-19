@@ -95,7 +95,7 @@ SMILESX_utils.Interpretation(data=sol_data,
                              k_fold_index = 0,           # model id to use for interpretation
                              augmentation = True, 
                              outdir = "../data/", 
-                             smiles_toviz = 'ClC1=C(Cl)[C@]2(Cl)[C@H]3[C@H]4C[C@H]([C@@H]5O[C@@H]54)[C@H]3[C@@]1(Cl)C2(Cl)Cl', 
+                             smiles_toviz = 'Cc1ccc(O)cc1C', 
                              font_size = 15,             # plots font parameter
                              font_rotation = 'vertical') # plots font parameter
 ```
@@ -103,3 +103,11 @@ SMILESX_utils.Interpretation(data=sol_data,
 Returns:
 1. 1D attention map on individual tokens
 ![1d_attention_map](/images/Interpretation_1D_FreeSolv_SAMPL_seed_17730.png)
+
+2. 2D attention map on individual vertices and edges
+![2d_attention_map](/images/Interpretation_2D_FreeSolv_SAMPL_seed_17730.png)
+
+3. Temporal relative distance to the final prediction, or evolution of the inference with sequential addition of tokens along a SMILES
+![temporal_map](/images/Interpretation_temporal_FreeSolv_SAMPL_seed_17730.png)
+
+Please refer to the article for further details
