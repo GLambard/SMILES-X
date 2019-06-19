@@ -91,12 +91,12 @@ SMILESX_utils.Interpretation(data=sol_data,
                              data_name=data_name, 
                              data_units='', 
                              k_fold_number = 3,
-                             k_fold_index = 0,           # model id to use for interpretation
+                             k_fold_index = 0,               # model id to use for interpretation
                              augmentation = True, 
                              outdir = "../data/", 
-                             smiles_toviz = 'Cc1ccc(O)cc1C', 
-                             font_size = 15,             # plots font parameter
-                             font_rotation = 'vertical') # plots font parameter
+                             smiles_toviz = 'Cc1ccc(O)cc1C', # SMILES to interpret
+                             font_size = 15,                 # plots font parameter
+                             font_rotation = 'vertical')     # plots font parameter
 ```
 
 Returns:
