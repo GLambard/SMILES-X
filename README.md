@@ -35,8 +35,8 @@ prop_tag = 'expt' # which column corresponds to the property to infer in the *.c
 
 sol_data = pd.read_csv(validation_data_dir+data_name+extension)
 sol_data = sol_data[['smiles',prop_tag]] # reduce the data to (SMILES, property) sets
-# If the column containing the SMILES has a different name, feel free to change it accordingly
 ```
+If the column containing the SMILES has a different name, feel free to change it accordingly
 
 * Define architectural hyper-parameters bounds to be used for the neural architecture search
 ```python
