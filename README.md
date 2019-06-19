@@ -101,3 +101,5 @@ SMILESX_utils.Interpretation(data=sol_data,
 ```
 
 Returns:
+1. 1D attention map on individual tokens
+![1d_attention_map](/images/Interpretation_1D_FreeSolv_SAMPL_seed_17730.png)
