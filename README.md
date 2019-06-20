@@ -2,11 +2,11 @@
 Autonomous molecular compounds characterization for small datasets without descriptors
 
 Guillaume Lambard (1), Ekaterina Gracheva (2,3)
-1. Research and Services Division of Materials Data and Integrated System, Energy Materials Design Group, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044, Japan.
+<sub>1. Research and Services Division of Materials Data and Integrated System, Energy Materials Design Group, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044, Japan.
 2. International Center for Materials Nanoarchitectonics, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044 Japan.
-3. University of Tsukuba, 1-1-1 Tennodai, Tsukuba, Ibaraki, 305-8577 Japan.
+3. University of Tsukuba, 1-1-1 Tennodai, Tsukuba, Ibaraki, 305-8577 Japan.</sub>
 
-On arXiv:
+**On arXiv:**
 
 ## What is it?
 The **SMILES-X** is an autonomous pipeline which **find best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
