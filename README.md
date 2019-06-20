@@ -35,8 +35,8 @@ All these datasets are available in the `validation_data/` directory above.
 ## Dependencies
 **You must have an access to at least 1 NVIDIA GPU** with:</br>
 * CUDA >=9.0
-* cuDNN >= 7.3.0
-in order to use the SMILES-X. For now, the SMILES-X has been successfully runned on Titan(Xp, V, V100, P100), GTX 1660 and RTX 2070/80 NVIDIA GPUs.</br>
+* cuDNN >= 7.3.0</br>
+For now, the SMILES-X has been successfully runned on Titan(Xp, V, V100, P100), GTX 1660 and RTX 2070/80 NVIDIA GPUs.</br>
 </br>
 For a good start, follow the [RDKit installation guide](https://www.rdkit.org/docs/Install.html) for installing the RDKit via conda.</br>
 Then, install the following dependencies in your RDKit conda environment (e.g. my-rdkit-env):</br>
