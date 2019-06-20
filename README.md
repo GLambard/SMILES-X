@@ -9,12 +9,12 @@ Guillaume Lambard (1), Ekaterina Gracheva (2,3)</br>
 **On arXiv:**
 
 ## What is it?
-The **SMILES-X** is an autonomous pipeline which **find best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
+The **SMILES-X** is an autonomous pipeline that **finds best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
 
-## In which research fields the SMILES-X can be used?
-Materials science, physicochemistry, drug discovery and related fields
+## Who can use the SMILES-X?
+Researchers/engineers/students in the fields of materials science, physicochemistry, drug discovery and related fields
  
-## Which kind of dataset can I use with it?
+## Which kind of data can be used?
 The SMILES-X is dedicated to **small datasets (<< 1000 samples) of (molecular SMILES, experimental/simulated property)**
 
 ## What can I do with it?
@@ -43,7 +43,7 @@ import SMILESX_utils
 %matplotlib inline
 ```
 
-### How to find the best architectures fitted to my dataset?
+### How to find the best architectures for my dataset?
 * After basic libraries import, unfold your dataset
 ```
 validation_data_dir = "../validation_data/"
