@@ -21,9 +21,9 @@ With the SMILES-X, you can:
 ## What is the efficiency of the SMILES-X on benchmark datasets?
 ![table1](/images/Table1_SMILESX_paper.png)
 
-* ESOL contains the logarithmic aqueous solubility (mols/L) for 1128 organic small molecules.
-* FreeSolv consists of the calculated and experimental hydration free energies (kcal/mol) for 642 small neutral molecules in water.
-* Lipophilicity stores the experimental data on octanol/water distribution coefficient (logD at pH 7.4) for 4200 compounds. 
+* ESOL: logarithmic aqueous solubility (mols/L) for 1128 organic small molecules.
+* FreeSolv: calculated and experimental hydration free energies (kcal/mol) for 642 small neutral molecules in water.
+* Lipophilicity: experimental data on octanol/water distribution coefficient (logD at pH 7.4) for 4200 compounds. 
 
 All these datasets are available in the `validation_data/` directory above. 
 
