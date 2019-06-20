@@ -3,7 +3,7 @@ Autonomous molecular compounds characterization for small datasets without descr
 
 Guillaume Lambard (1), Ekaterina Gracheva (2,3)
 
-<font size="-1">1. Research and Services Division of Materials Data and Integrated System, Energy Materials Design Group, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044, Japan.</font>
+<font size="-10">1. Research and Services Division of Materials Data and Integrated System, Energy Materials Design Group, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044, Japan.</font>
 <sub>2. International Center for Materials Nanoarchitectonics, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044 Japan.</sub>
 <sub>3. University of Tsukuba, 1-1-1 Tennodai, Tsukuba, Ibaraki, 305-8577 Japan.</sub>
 
