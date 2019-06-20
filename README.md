@@ -4,13 +4,13 @@ Autonomous molecular compounds characterization for small datasets without descr
 On arXiv:
 
 ## What is it?
-The **SMILES-X** is an autonomous pipeline which **find best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 5000 samples). 
+The **SMILES-X** is an autonomous pipeline which **find best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
 
 ## In which research fields the SMILES-X can be used?
 Materials science, physicochemistry, drug discovery and related fields
  
 ## Which kind of dataset can I use with it?
-The SMILES-X is dedicated to **small datasets (<< 5000 samples) of (molecular SMILES, experimental/simulated property)**
+The SMILES-X is dedicated to **small datasets (<< 1000 samples) of (molecular SMILES, experimental/simulated property)**
 
 ## What can I do with it?
 With the SMILES-X, you can:
