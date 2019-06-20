@@ -18,6 +18,9 @@ With the SMILES-X, you can:
 * **Predict molecular properties** of a list of SMILES based on designed models ensembling **without human-engineered descriptors**.
 * **Interpret a prediction** by visualizing the salient elements and/or substructures most related to a property
 
+## What is the efficiency of the SMILES-X on benchmark datasets?
+![table1](/images/Table1_SMILESX_paper.png)
+
 ## Usage
 
 * Copy and paste **`SMILESX_utils.py`** to your working directory
