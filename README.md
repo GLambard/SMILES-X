@@ -28,6 +28,7 @@ With the SMILES-X, you can:
 All these datasets are available in the `validation_data/` directory above. 
 
 ## Usage
+The following instruction is a summary from the python notebooks `SMILESX_Prediction_github.ipynb` and `SMILESX_Visualization_github.ipynb` available above. Please feel free to download, use and modify them. 
 
 * Copy and paste **`SMILESX_utils.py`** to your working directory
 * Use the following basic import to your jupyter notebook
