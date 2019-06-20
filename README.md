@@ -123,3 +123,5 @@ Returns:
 ![temporal_map](/images/Interpretation_temporal_FreeSolv_SAMPL_seed_17730.png)
 
 Please refer to the article for further details
+
+## How to cite the SMILES-X?
