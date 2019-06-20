@@ -32,6 +32,23 @@ With the SMILES-X, you can:
 
 All these datasets are available in the `validation_data/` directory above. 
 
+## Dependencies
+**You must have an access to at least 1 NVIDIA GPU with CUDA >=9.0 and cuDNN >= 7.3.0 installed** in order to use the SMILES-X.</br>
+For now, the SMILES-X has been successfully runned on Titan(Xp, V, V100, P100), GTX 1660 and RTX 2070/80 NVIDIA GPUs.</br> 
+For a good start, follow the [RDKit installation guide](https://www.rdkit.org/docs/Install.html) for installing the RDKit via conda.</br>
+Then, install the following dependencies in your RDKit conda environment (e.g. my-rdkit-env):</br>
+* python >= 3.6
+* pandas >= 0.24.2
+* numpy >= 1.16.4
+* matplotlib >= 3.1.0
+* GPy >= 1.9.8
+* GPyOpt >= 1.2.5
+* scikit-learn >= 0.21.2
+* adjustText >= 0.7.3
+* scipy >= 1.3.0
+* Keras >= 2.2.4
+* tensorflow-gpu >= 1.12.0
+
 ## Usage
 The following instruction is a summary from the python notebooks `SMILESX_Prediction_github.ipynb` and `SMILESX_Visualization_github.ipynb` available above. Please feel free to download, use and modify them. 
 
