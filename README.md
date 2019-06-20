@@ -94,7 +94,8 @@ pred_from_ens = SMILESX_utils.Inference(data_name=data_name,
                                         outdir = "../data/")
 ```
 
-It returns a table of SMILES with their inferred property (mean, standard deviation) determined by models ensembling
+It returns a table of SMILES with their inferred property (mean, standard deviation) determined by models ensembling, e.g.
+![prediction_ex_table](/images/Prediction_Ex_SMILESX_paper.png)
 
 ### How to interpret a prediction?
 * Just use
