@@ -153,5 +153,12 @@ Please refer to the article for further details
 
 ## How to cite the SMILES-X?
 ```
-G. Lambard, E. Gracheva, "SMILES-X: autonomous molecular compounds characterization for small datasets without descriptors",	arXiv:1906.09938 [physics.comp-ph]
+@misc{lambard2019smilesx,
+    title={SMILES-X: autonomous molecular compounds characterization for small datasets without descriptors},
+    author={Guillaume Lambard and Ekaterina Gracheva},
+    year={2019},
+    eprint={1906.09938},
+    archivePrefix={arXiv},
+    primaryClass={physics.comp-ph}
+}
 ```
