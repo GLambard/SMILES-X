@@ -6,7 +6,7 @@ Guillaume Lambard (1), Ekaterina Gracheva (2,3)</br>
 <sub>2. International Center for Materials Nanoarchitectonics, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044 Japan.</sub></br>
 <sub>3. University of Tsukuba, 1-1-1 Tennodai, Tsukuba, Ibaraki, 305-8577 Japan.</sub></br>
 
-**On arXiv:**
+**On arXiv:** [	arXiv:1906.09938 [physics.comp-ph]](https://arxiv.org/abs/1906.09938)
 
 ## What is it?
 The **SMILES-X** is an autonomous pipeline that **finds best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
@@ -152,3 +152,6 @@ Returns:
 Please refer to the article for further details
 
 ## How to cite the SMILES-X?
+```
+G. Lambard, E. Gracheva, "SMILES-X: autonomous molecular compounds characterization for small datasets without descriptors",	arXiv:1906.09938 [physics.comp-ph]
+```
