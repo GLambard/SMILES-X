@@ -67,7 +67,7 @@ import SMILESX_utils
 ### How to find the best architectures for my dataset?
 * After basic libraries import, unfold your dataset
 ```
-validation_data_dir = "../validation_data/"
+validation_data_dir = "./validation_data/"
 extension = '.csv'
 data_name = 'FreeSolv' # FreeSolv, ESOL, Lipophilicity or your own dataset
 prop_tag = 'expt' # which column corresponds to the property to infer in the *.csv file
