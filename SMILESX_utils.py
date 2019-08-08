@@ -646,13 +646,14 @@ def Embedding_Vis(data,
                  prop_input=np.array(data.iloc[:,1]), 
                  random_state=selection_seed, 
                  scaling = True)
-
-    print("***Data augmentation.***\n")
+  
     # data augmentation or not
     if augmentation == True:
+        print("***Data augmentation.***\n")
         canonical = False
         rotation = True
     else:
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -809,13 +810,14 @@ def TokensFinder(data,
                  prop_input=np.array(data.iloc[:,1]), 
                  random_state=selection_seed, 
                  scaling = True)
-
-    print("***Data augmentation.***\n")
+    
     # data augmentation or not
     if augmentation == True:
+        print("***Data augmentation.***\n")
         canonical = False
         rotation = True
     else:
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -931,12 +933,13 @@ def Interpretation(data,
     else:
         smiles_toviz_y = np.array([[np.nan]])
 
-    print("***Data augmentation.***\n")
     # data augmentation or not
     if augmentation == True:
+        print("***Data augmentation.***\n")
         canonical = False
         rotation = True
     else:
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -1164,13 +1167,14 @@ def Inference(data_name,
     
     smiles_x = np.array(smiles_checked)
     smiles_y = np.array([[np.nan]*len(smiles_checked)]).flatten()
-    
-    print("***Data augmentation.***\n")
+     
     # data augmentation or not
     if augmentation == True:
+        print("***Data augmentation.***\n")
         canonical = False
         rotation = True
     else:
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -1310,13 +1314,14 @@ def Main(data,
                      prop_input=np.array(data.iloc[:,1]), 
                      random_state=selection_seed, 
                      scaling = True)
-        
-        print("***Data augmentation to {}***\n".format(augmentation))
+              
         # data augmentation or not
         if augmentation == True:
+            print("***Data augmentation to {}***\n".format(augmentation))
             canonical = False
             rotation = True
         else:
+            print("***No data augmentation has been required.***\n")
             canonical = True
             rotation = False
             
