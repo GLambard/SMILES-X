@@ -653,7 +653,7 @@ def Embedding_Vis(data,
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation required.***\n")
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -817,7 +817,7 @@ def TokensFinder(data,
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation required.***\n")
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -939,7 +939,7 @@ def Interpretation(data,
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation required.***\n")
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -1174,7 +1174,7 @@ def Inference(data_name,
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation required.***\n")
+        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
 
@@ -1321,7 +1321,7 @@ def Main(data,
             canonical = False
             rotation = True
         else:
-            print("***No data augmentation required.***\n")
+            print("***No data augmentation has been required.***\n")
             canonical = True
             rotation = False
             
