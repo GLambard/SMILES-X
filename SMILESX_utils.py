@@ -1608,19 +1608,65 @@ def Main(data,
         print("For the test set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_test, np.sqrt(mse_test), corrcoef_test))
 
-        # Plot the final result
-        plt.scatter(scaler.inverse_transform(y_train), 
-                    scaler.inverse_transform(y_pred_train_mean.reshape(-1,1)), label="Train")
-        plt.scatter(scaler.inverse_transform(y_valid), 
-                    scaler.inverse_transform(y_pred_valid_mean.reshape(-1,1)), label="Validation")
-        plt.scatter(scaler.inverse_transform(y_test), 
-                    scaler.inverse_transform(y_pred_test_mean.reshape(-1,1)), label="Test")
-        plt.plot([np.min(data.iloc[:,1]),np.max(data.iloc[:,1])],
-                 [np.min(data.iloc[:,1]),np.max(data.iloc[:,1])], 
-                 '--', color = 'r', alpha = 0.5)
-        plt.xlabel('Observations '+data_units, fontsize = 12)
-        plt.ylabel('Predictions '+data_units, fontsize = 12)
+        # Changed colors, scaling and sizes
+        plt.figure(figsize=(12, 8))
+
+        #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Setting plot limits
+        y_true_min = min(np.min(y_train), np.min(y_valid), np.min(y_test))
+        y_true_max = max(np.max(y_train), np.max(y_valid), np.max(y_test))
+        y_pred_min = min(np.min(y_pred_train_mean), np.min(y_pred_valid_mean), np.min(y_pred_test_mean))
+        y_pred_max = max(np.max(y_pred_train_mean), np.max(y_pred_valid_mean), np.max(y_pred_test_mean))
+        # Expanding slightly the canvas around the data points (by 10%)
+        axmin = y_true_min-0.1*(y_true_max-y_true_min)
+        axmax = y_true_max+0.1*(y_true_max-y_true_min)
+        aymin = y_pred_min-0.1*(y_pred_max-y_pred_min)
+        aymax = y_pred_max+0.1*(y_pred_max-y_pred_min)
+
+        plt.xlim(min(axmin, aymin), max(axmax, aymax))
+        plt.ylim(min(axmin, aymin), max(axmax, aymax))
+                        
+        plt.errorbar(y_train, 
+                    y_pred_train_mean,
+                    fmt='o',
+                    label="Train",
+                    elinewidth = 0, 
+                    ms=5,
+                    mfc='#73b8d9',
+                    markeredgewidth = 0,
+                    alpha=0.7)
+        plt.errorbar(y_valid,
+                    y_pred_valid_mean,
+                    elinewidth = 0,
+                    fmt='o',
+                    label="Validation", 
+                    ms=5, 
+                    mfc='#db702e',
+                    markeredgewidth = 0,
+                    alpha=0.7)
+        plt.errorbar(y_test,
+                    y_pred_test_mean,
+                    elinewidth = 0,
+                    fmt='o',
+                    label="Test", 
+                    ms=5, 
+                    mfc='#cc1b00',
+                    markeredgewidth = 0,
+                    alpha=0.7)
+
+
+        # Plot X=Y line
+        plt.plot([max(plt.xlim()[0], plt.ylim()[0]), 
+                  min(plt.xlim()[1], plt.ylim()[1])],
+                 [max(plt.xlim()[0], plt.ylim()[0]), 
+                  min(plt.xlim()[1], plt.ylim()[1])],
+                 ':', color = '#595f69')
+        
+        plt.xlabel('Observations ' + data_units, fontsize = 12)
+        plt.ylabel('Predictions ' + data_units, fontsize = 12)
         plt.legend()
-        plt.savefig(save_dir+'TrainValidTest_Plot_LSTMAtt_'+data_name+'_model_weights.best_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+
+        # Added fold number
+        plt.savefig(save_dir+'TrainValid_Plot_LSTMAtt_'+data_name+'_model_weights.best_seed_'+str(selection_seed)+'_fold_'+str(ifold)+'.png', bbox_inches='tight', dpi=80)
         plt.close()
 ##
