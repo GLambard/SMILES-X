@@ -6,7 +6,7 @@ Guillaume Lambard (1), Ekaterina Gracheva (2,3)</br>
 <sub>2. International Center for Materials Nanoarchitectonics, National Institute for Materials Science, 1-1 Namiki, Tsukuba, Ibaraki, 305-0044 Japan.</sub></br>
 <sub>3. University of Tsukuba, 1-1-1 Tennodai, Tsukuba, Ibaraki, 305-8577 Japan.</sub></br>
 
-**On arXiv:** [	arXiv:1906.09938 [physics.comp-ph]](https://arxiv.org/abs/1906.09938)
+**On arXiv:** [ arXiv:1906.09938 [physics.comp-ph]](https://arxiv.org/abs/1906.09938)
 
 ## What is it?
 The **SMILES-X** is an autonomous pipeline that **finds best neural architectures to predict a physicochemical property from molecular SMILES only** (see [OpenSMILES](http://opensmiles.org/opensmiles.html)). **No human-engineered descriptors are needed**. The SMILES-X has been especially **designed for small datasets** (<< 1000 samples). 
@@ -56,11 +56,11 @@ Then, install the following dependencies in your RDKit conda environment (e.g. m
 ## Usage
 The following instruction is a summary from the python notebooks `SMILESX_Prediction_github.ipynb` and `SMILESX_Visualization_github.ipynb` available above. Please feel free to download, use and modify them. 
 
-* Copy and paste **`SMILESX_utils.py`** to your working directory
+* Copy and paste the directory called **`SMILESX`** into your working directory
 * Use the following basic import to your jupyter notebook
 ```python
 import pandas as pd
-import SMILESX_utils
+from SMILESX import main, interpret, inference
 %matplotlib inline
 ```
 
@@ -94,31 +94,31 @@ These bounds are used in the paper, but they can be tuned according to your data
 
 * Let the SMILES-X find the best architectures for the most accurate property predictions
 ```python
-SMILESX_utils.Main(data=sol_data,        # provided data (SMILES, property)
-                   data_name=data_name,  # dataset's name
-                   data_units='',        # property's SI units
-                   bayopt_bounds=bounds, # bounds contraining the Bayesian search of neural architectures
-                   k_fold_number = 10,   # number of k-folds used for cross-validation
-                   augmentation = True,  # SMILES augmentation
-                   outdir = "../data/",  # directory for outputs (plots + .txt files)
-                   bayopt_n_epochs = 10, # number of epochs for training during Bayesian search
-                   bayopt_n_rounds = 25, # number of architectures to sample during Bayesian search 
-                   bayopt_on = True,     # use Bayesian search
-                   n_gpus = 1,           # number of GPUs to be used
-                   patience = 25,        # number of epochs with no improvement after which training will be stopped
-                   n_epochs = 100)       # maximum of epochs for training
+main.Main(data=sol_data,        # provided data (SMILES, property)
+          data_name=data_name,  # dataset's name
+          data_units='',        # property's SI units
+          bayopt_bounds=bounds, # bounds contraining the Bayesian search of neural architectures
+          k_fold_number = 10,   # number of k-folds used for cross-validation
+          augmentation = True,  # SMILES augmentation
+          outdir = "./data/",  # directory for outputs (plots + .txt files)
+          bayopt_n_epochs = 10, # number of epochs for training during Bayesian search
+          bayopt_n_rounds = 25, # number of architectures to sample during Bayesian search 
+          bayopt_on = True,     # use Bayesian search
+          n_gpus = 1,           # number of GPUs to be used
+          patience = 25,        # number of epochs with no improvement after which training will be stopped
+          n_epochs = 100)       # maximum of epochs for training
 ```
-Please refer to the **`SMILESX_utils.py`** for a detailed review of the options 
+Please refer to the **`SMILESX/main.py`** for a detailed review of the options 
 
 ### How to infer a property on new data (SMILES)?
 * Just use
 ```python
-pred_from_ens = SMILESX_utils.Inference(data_name=data_name, 
-                                        smiles_list = ['CC','CCC','C=O'], # new list of SMILES to characterize
-                                        data_units = '',
-                                        k_fold_number = 3,                # number of k-folds used for inference
-                                        augmentation = True,              # with SMILES augmentation
-                                        outdir = "../data/")
+pred_from_ens = inference.Inference(data_name=data_name, 
+                                    smiles_list = ['CC','CCC','C=O'], # new list of SMILES to characterize
+                                    data_units = '',
+                                    k_fold_number = 3,                # number of k-folds used for inference
+                                    augmentation = True,              # with SMILES augmentation
+                                    outdir = "./data/")
 ```
 
 It returns a table of SMILES with their inferred property (mean, standard deviation) determined by models ensembling, e.g.
@@ -127,16 +127,16 @@ It returns a table of SMILES with their inferred property (mean, standard deviat
 ### How to interpret a prediction?
 * Just use
 ```python
-SMILESX_utils.Interpretation(data=sol_data, 
-                             data_name=data_name, 
-                             data_units='', 
-                             k_fold_number = 3,
-                             k_fold_index = 0,               # model id to use for interpretation
-                             augmentation = True, 
-                             outdir = "../data/", 
-                             smiles_toviz = 'Cc1ccc(O)cc1C', # SMILES to interpret
-                             font_size = 15,                 # plots font parameter
-                             font_rotation = 'vertical')     # plots font parameter
+interpret.Interpretation(data=sol_data, 
+                         data_name=data_name, 
+                         data_units='', 
+                         k_fold_number = 3,
+                         k_fold_index = 0,               # model id to use for interpretation
+                         augmentation = True, 
+                         outdir = "./data/", 
+                         smiles_toviz = 'Cc1ccc(O)cc1C', # SMILES to interpret
+                         font_size = 15,                 # plots font parameter
+                         font_rotation = 'vertical')     # plots font parameter
 ```
 
 Returns:
