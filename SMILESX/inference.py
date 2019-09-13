@@ -9,7 +9,7 @@ from keras import backend as K
 from keras import metrics
 import tensorflow as tf
 
-from SMILESX import utils, smimodel, token, augm
+from SMILESX import utils, model, token, augm
 
 ##
 config = tf.ConfigProto()
@@ -105,23 +105,23 @@ def Inference(data_name,
         int_to_token = token.get_inttotoken(tokens)
         
         # Best architecture to visualize from
-        model = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(seed_list[ifold])+'.hdf5', 
-                               custom_objects={'AttentionM': smimodel.AttentionM()})
+        model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(seed_list[ifold])+'.hdf5', 
+                               custom_objects={'AttentionM': model.AttentionM()})
 
         if ifold == 0:
             # Maximum of length of SMILES to process
-            max_length = model.layers[0].output_shape[-1]
+            max_length = model_train.layers[0].output_shape[-1]
             print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
             print("Maximum length of tokenized SMILES: {} tokens\n".format(max_length))
 
-        model.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
+        model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
         # predict and compare for the training, validation and test sets
         smiles_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = smiles_x_enum_tokens, 
                                                       max_length = max_length, 
                                                       vocab = tokens)
 
-        smiles_y_pred = model.predict(smiles_x_enum_tokens_tointvec)
+        smiles_y_pred = model_train.predict(smiles_x_enum_tokens_tointvec)
 
         # compute a mean per set of augmented SMILES
         smiles_y_pred_mean, _ = utils.mean_median_result(smiles_x_enum_card, smiles_y_pred)
