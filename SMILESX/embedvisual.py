@@ -10,7 +10,7 @@ from sklearn.cluster import AffinityPropagation
 from itertools import cycle
 from adjustText import adjust_text
 
-from SMILESX import smimodel, utils, token, augm
+from SMILESX import model, utils, token, augm
 
 ## Visualization of the Embedding layer 
 # data: provided data (numpy array of: (SMILES, property))
@@ -116,17 +116,17 @@ def Embedding_Vis(data,
     token_to_int = token.get_tokentoint(tokens)
     int_to_token = token.get_inttotoken(tokens)
 
-    model = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
-                       custom_objects={'AttentionM': smimodel.AttentionM()})
+    model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
+                       custom_objects={'AttentionM': model.AttentionM()})
 
     print("Chosen model summary:\n")
-    print(model.summary())
+    print(model_train.summary())
     print("\n")
 
     print("***Embedding of the individual tokens from the chosen model.***\n")
-    model.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
+    model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
-    model_embed_weights = model.layers[1].get_weights()[0]
+    model_embed_weights = model_train.layers[1].get_weights()[0]
     #print(model_embed_weights.shape)
     #tsne = TSNE(perplexity=30, early_exaggeration=120 , n_components=2, random_state=123, verbose=0)
     pca = PCA(n_components=2, random_state=123)
