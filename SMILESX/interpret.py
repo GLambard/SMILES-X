@@ -17,7 +17,7 @@ from keras import metrics
 from keras import backend as K
 import tensorflow as tf
 
-from SMILESX import utils, smimodel, token, augm
+from SMILESX import utils, model, token, augm
 
 ##
 config = tf.ConfigProto()
@@ -161,13 +161,13 @@ def Interpretation(data,
 
     # Best architecture to visualize from
     model_topredict = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
-                           custom_objects={'AttentionM': smimodel.AttentionM()})
+                           custom_objects={'AttentionM': model.AttentionM()})
     best_arch = [model_topredict.layers[2].output_shape[-1]/2, 
                  model_topredict.layers[3].output_shape[-1], 
                  model_topredict.layers[1].output_shape[-1]]
 
     # Architecture to return attention weights
-    model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+    model_att = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                 vocabsize = vocab_size, 
                                 lstmunits= int(best_arch[0]), 
                                 denseunits = int(best_arch[1]), 
@@ -175,19 +175,19 @@ def Interpretation(data,
                                 return_proba = True)
 
     print("Best model summary:\n")
-    print(model.summary())
+    print(model_att.summary())
     print("\n")
 
     print("***Interpretation from the best model.***\n")
-    model.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
-    model.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
+    model_att.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
+    model_att.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
     smiles_toviz_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list= smiles_toviz_x_enum_tokens, 
                                                          max_length = max_length+1,
                                                          vocab = tokens)
     
-    intermediate_layer_model = Model(inputs=model.input,
-                                     outputs=model.layers[-2].output)
+    intermediate_layer_model = Model(inputs=model_att.input,
+                                     outputs=model_att.layers[-2].output)
     intermediate_output = intermediate_layer_model.predict(smiles_toviz_x_enum_tokens_tointvec)
     
     smiles_toviz_x_card_cumsum_viz = np.cumsum(smiles_toviz_x_enum_card)
