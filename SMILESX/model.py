@@ -1,6 +1,6 @@
 from keras.models import Model
 
-from keras.layers import Input, Dropout, Dense
+from keras.layers import Input, Dense
 from keras.layers import Embedding
 from keras.layers.wrappers import Bidirectional
 from keras.layers import CuDNNLSTM, TimeDistributed
@@ -139,109 +139,4 @@ class ModelMGPU(Model):
             return getattr(self._smodel, attrname)
 
         return super(ModelMGPU, self).__getattribute__(attrname)
-##
-##
-class AttentionMNoTrain(Layer):
-    """
-    Keras layer to compute an attention vector on an incoming matrix.
-    # Input
-        enc - 3D Tensor of shape (BATCH_SIZE, MAX_TIMESTEPS, EMBED_SIZE)
-        weight - the value for the weights initialisation
-    # Output
-        2D Tensor of shape (BATCH_SIZE, EMBED_SIZE)
-    # Usage
-        enc = LSTM(EMBED_SIZE, return_sequences=True)(...)
-        att = AttentionM()(enc)
-    """    
-    def __init__(self, weight, return_probabilities = False, **kwargs,):
-        self.weight = weight
-        self.return_probabilities = return_probabilities
-        super(AttentionMNoTrain, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        # W: (EMBED_SIZE, 1)
-        # b: (MAX_TIMESTEPS,)
-        self.W = self.add_weight(name="W_{:s}".format(self.name), 
-                                 shape=(input_shape[-1], 1),
-                                 # initializer=initializers.constant(value=self.weight))
-                                 initializer=initializers.random_normal(mean=self.weight, stddev=0.05, seed=123))
-        self.b = self.add_weight(name="b_{:s}".format(self.name),
-                                 shape=(input_shape[1], 1),
-                                 initializer="zeros")
-        super(AttentionMNoTrain, self).build(input_shape)
-
-
-    def call(self, x, mask=None):
-        # input: (BATCH_SIZE, MAX_TIMESTEPS, EMBED_SIZE)
-        # et: (BATCH_SIZE, MAX_TIMESTEPS)
-        et = K.squeeze(K.tanh(K.dot(x, self.W) + self.b), axis=-1)
-        # at: (BATCH_SIZE, MAX_TIMESTEPS)
-        at = K.softmax(et)
-        if mask is not None:
-            at *= K.cast(mask, K.floatx())
-        # atx: (BATCH_SIZE, MAX_TIMESTEPS, 1)
-        atx = K.expand_dims(at, axis=-1)
-        # ot: (BATCH_SIZE, MAX_TIMESTEPS, EMBED_SIZE)
-        ot = x * atx
-        # output: (BATCH_SIZE, EMBED_SIZE)
-        if self.return_probabilities: 
-            return atx # for visualization of the attention weights
-        else:
-            return K.sum(ot, axis=1) # for prediction
-
-    
-    def compute_mask(self, input, input_mask=None):
-        # do not pass the mask to the next layers
-        return None
-    
-    
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
-
-    def get_config(self):
-        return super(AttentionMNoTrain, self).get_config()
-##
-
-## Neural architecture of the SMILES-X for the optimization step
-class LSTMAttModelNoTrain():
-    # Initialization
-    # inputtokens: maximum length for the encoded and tokenized SMILES
-    # vocabsize: size of the vocabulary
-    # lstmunits: number of LSTM units
-    # denseunits: number of dense units
-    # embedding: dimension of the embedded vectors
-    # return_proba: return the attention vector (True) or not (False) (Default: False)
-    # Returns: 
-    #         a model in the Keras API format
-    @staticmethod
-
-    def create(inputtokens, vocabsize, weight, lstmunits=16, denseunits=16, embedding=32, return_proba = False):
-
-        input_ = Input(shape=(inputtokens,), dtype='int32')
-
-        # Embedding layer
-        net = Embedding(input_dim=vocabsize, 
-                        output_dim=embedding, 
-                        input_length=inputtokens,
-                        #embeddings_initializer=initializers.random_normal(mean=weight))(input_)
-                        embeddings_initializer=initializers.random_normal(mean=weight, stddev=0.05, seed=123))(input_)
-
-        # Bidirectional LSTM layer
-        net = Bidirectional(CuDNNLSTM(lstmunits, 
-                            return_sequences=True, 
-                            # kernel_initializer=initializers.constant(value=weight),
-                            # recurrent_initializer=initializers.constant(value=weight)))(net)
-                            kernel_initializer=initializers.random_normal(mean=weight, stddev=0.05, seed=123),
-                            recurrent_initializer=initializers.random_normal(mean=weight, stddev=0.05, seed=123)))(net)
-        net = TimeDistributed(Dense(denseunits, kernel_initializer=initializers.random_normal(mean=weight, stddev=0.05, seed=123)))(net)
-        # net = TimeDistributed(Dense(denseunits, kernel_initializer=initializers.constant(value=weight)))(net)
-        net = AttentionMNoTrain(weight=weight, return_probabilities=return_proba)(net)
-
-        # Output layer
-        net = Dense(1, activation="linear", kernel_initializer=initializers.random_normal(mean=weight, stddev=0.05, seed=123))(net)
-        # net = Dense(1, activation="linear", kernel_initializer=initializers.random_normal(mean=weight))(net)
-        model = Model(inputs=input_, outputs=net)
-
-        return model
 ##
