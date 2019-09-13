@@ -106,7 +106,7 @@ def Inference(data_name,
         
         # Best architecture to visualize from
         model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(seed_list[ifold])+'.hdf5', 
-                               custom_objects={'AttentionM': model.AttentionM()})
+                                 custom_objects={'AttentionM': model.AttentionM()})
 
         if ifold == 0:
             # Maximum of length of SMILES to process
@@ -118,8 +118,8 @@ def Inference(data_name,
 
         # predict and compare for the training, validation and test sets
         smiles_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = smiles_x_enum_tokens, 
-                                                      max_length = max_length, 
-                                                      vocab = tokens)
+                                                             max_length = max_length, 
+                                                             vocab = tokens)
 
         smiles_y_pred = model_train.predict(smiles_x_enum_tokens_tointvec)
 

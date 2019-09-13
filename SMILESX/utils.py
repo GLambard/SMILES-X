@@ -36,9 +36,9 @@ def random_split(smiles_input, prop_input, random_state, scaling = True):
     
     if scaling == True:
         scaler = RobustScaler(with_centering=True, 
-                      with_scaling=True, 
-                      quantile_range=(5.0, 95.0), 
-                      copy=True)
+                              with_scaling=True, 
+                              quantile_range=(5.0, 95.0), 
+                              copy=True)
         scaler_fit = scaler.fit(y_train)
         print("Scaler: {}".format(scaler_fit))
         y_train = scaler.transform(y_train)

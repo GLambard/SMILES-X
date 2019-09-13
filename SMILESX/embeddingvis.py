@@ -56,9 +56,9 @@ def Embedding_Vis(data,
     print("***Sampling and splitting of the dataset.***\n")
     x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
     utils.random_split(smiles_input=data.smiles, 
-                 prop_input=np.array(data.iloc[:,1]), 
-                 random_state=selection_seed, 
-                 scaling = True)
+                       prop_input=np.array(data.iloc[:,1]), 
+                       random_state=selection_seed, 
+                       scaling = True)
   
     # data augmentation or not
     if augmentation == True:
@@ -117,7 +117,7 @@ def Embedding_Vis(data,
     int_to_token = token.get_inttotoken(tokens)
 
     model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
-                       custom_objects={'AttentionM': model.AttentionM()})
+                             custom_objects={'AttentionM': model.AttentionM()})
 
     print("Chosen model summary:\n")
     print(model_train.summary())

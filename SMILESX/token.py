@@ -135,9 +135,9 @@ def TokensFinder(data,
     print("***Sampling and splitting of the dataset.***\n")
     x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
     utils.random_split(smiles_input=data.smiles, 
-                 prop_input=np.array(data.iloc[:,1]), 
-                 random_state=selection_seed, 
-                 scaling = True)
+                       prop_input=np.array(data.iloc[:,1]), 
+                       random_state=selection_seed, 
+                       scaling = True)
     
     # data augmentation or not
     if augmentation == True:

@@ -155,9 +155,9 @@ def Main(data,
         selection_seed = seed_list[ifold]
         x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
         utils.random_split(smiles_input=data.smiles, 
-                     prop_input=np.array(data.iloc[:,1]), 
-                     random_state=selection_seed, 
-                     scaling = True)
+                           prop_input=np.array(data.iloc[:,1]), 
+                           random_state=selection_seed, 
+                           scaling = True)
               
         # data augmentation or not
         if augmentation == True:
@@ -244,25 +244,25 @@ def Main(data,
                 if n_gpus > 1:
                     if bridge_type == 'NVLink':
                         model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                    vocabsize = vocab_size, 
-                                                    lstmunits=int(params[:,0][0]), 
-                                                    denseunits = int(params[:,1]), 
-                                                    embedding = int(params[:,2][0]))
+                                                              vocabsize = vocab_size, 
+                                                              lstmunits=int(params[:,0][0]), 
+                                                              denseunits = int(params[:,1]), 
+                                                              embedding = int(params[:,2][0]))
                     else:
                         with tf.device('/cpu'): # necessary to multi-GPU scaling
                             model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                        vocabsize = vocab_size, 
-                                                        lstmunits=int(params[:,0][0]), 
-                                                        denseunits = int(params[:,1]), 
-                                                        embedding = int(params[:,2][0]))
+                                                                  vocabsize = vocab_size, 
+                                                                  lstmunits=int(params[:,0][0]), 
+                                                                  denseunits = int(params[:,1]), 
+                                                                  embedding = int(params[:,2][0]))
                             
                     multi_model = model.ModelMGPU(model_opt, gpus=n_gpus, bridge_type=bridge_type)
                 else: # single GPU
                     model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                vocabsize = vocab_size, 
-                                                lstmunits=int(params[:,0][0]), 
-                                                denseunits = int(params[:,1]), 
-                                                embedding = int(params[:,2][0]))
+                                                          vocabsize = vocab_size, 
+                                                          lstmunits=int(params[:,0][0]), 
+                                                          denseunits = int(params[:,1]), 
+                                                          embedding = int(params[:,2][0]))
                     
                     multi_model = model_opt
 
@@ -322,27 +322,27 @@ def Main(data,
         if n_gpus > 1:
             if bridge_type == 'NVLink':
                 model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                            vocabsize = vocab_size, 
-                                            lstmunits= int(best_arch[0]), 
-                                            denseunits = int(best_arch[1]), 
-                                            embedding = int(best_arch[2]))
+                                                        vocabsize = vocab_size, 
+                                                        lstmunits= int(best_arch[0]), 
+                                                        denseunits = int(best_arch[1]), 
+                                                        embedding = int(best_arch[2]))
             else:
                 with tf.device('/cpu'):
                     model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                vocabsize = vocab_size, 
-                                                lstmunits= int(best_arch[0]), 
-                                                denseunits = int(best_arch[1]), 
-                                                embedding = int(best_arch[2]))
+                                                            vocabsize = vocab_size, 
+                                                            lstmunits= int(best_arch[0]), 
+                                                            denseunits = int(best_arch[1]), 
+                                                            embedding = int(best_arch[2]))
             print("Best model summary:\n")
             print(model_train.summary())
             print("\n")
             multi_model = model.ModelMGPU(model_train, gpus=n_gpus, bridge_type=bridge_type)
         else:
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                        vocabsize = vocab_size, 
-                                        lstmunits= int(best_arch[0]), 
-                                        denseunits = int(best_arch[1]), 
-                                        embedding = int(best_arch[2]))
+                                                    vocabsize = vocab_size, 
+                                                    lstmunits= int(best_arch[0]), 
+                                                    denseunits = int(best_arch[1]), 
+                                                    embedding = int(best_arch[2]))
 
             print("Best model summary:\n")
             print(model_train.summary())
@@ -406,14 +406,14 @@ def Main(data,
 
         # predict and compare for the training, validation and test sets
         x_train_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_enum_tokens, 
-                                                      max_length = max_length+1, 
-                                                      vocab = tokens)
+                                                            max_length = max_length+1, 
+                                                            vocab = tokens)
         x_valid_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_valid_enum_tokens, 
-                                                      max_length = max_length+1, 
-                                                      vocab = tokens)
+                                                            max_length = max_length+1, 
+                                                            vocab = tokens)
         x_test_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_test_enum_tokens, 
-                                                     max_length = max_length+1, 
-                                                     vocab = tokens)
+                                                           max_length = max_length+1, 
+                                                           vocab = tokens)
 
         y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
         y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)
