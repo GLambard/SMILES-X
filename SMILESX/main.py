@@ -23,7 +23,7 @@ import multiprocessing
 
 from sklearn.metrics import r2_score
 
-from SMILESX import utils, token, augm, smimodel
+from SMILESX import utils, token, augm, model
 
 np.set_printoptions(precision=3)
 # 
@@ -243,28 +243,28 @@ def Main(data,
 
                 if n_gpus > 1:
                     if bridge_type == 'NVLink':
-                        model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+                        model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                     vocabsize = vocab_size, 
                                                     lstmunits=int(params[:,0][0]), 
                                                     denseunits = int(params[:,1]), 
                                                     embedding = int(params[:,2][0]))
                     else:
                         with tf.device('/cpu'): # necessary to multi-GPU scaling
-                            model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+                            model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                         vocabsize = vocab_size, 
                                                         lstmunits=int(params[:,0][0]), 
                                                         denseunits = int(params[:,1]), 
                                                         embedding = int(params[:,2][0]))
                             
-                    multi_model = smimodel.ModelMGPU(model, gpus=n_gpus, bridge_type=bridge_type)
+                    multi_model = model.ModelMGPU(model_opt, gpus=n_gpus, bridge_type=bridge_type)
                 else: # single GPU
-                    model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+                    model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                 vocabsize = vocab_size, 
                                                 lstmunits=int(params[:,0][0]), 
                                                 denseunits = int(params[:,1]), 
                                                 embedding = int(params[:,2][0]))
                     
-                    multi_model = model
+                    multi_model = model_opt
 
                 batch_size = int(params[:,3][0])
                 custom_adam = Adam(lr=math.pow(10,-float(params[:,4][0])))
@@ -321,33 +321,33 @@ def Main(data,
         # Define the multi-gpus model if necessary
         if n_gpus > 1:
             if bridge_type == 'NVLink':
-                model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+                model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                             vocabsize = vocab_size, 
                                             lstmunits= int(best_arch[0]), 
                                             denseunits = int(best_arch[1]), 
                                             embedding = int(best_arch[2]))
             else:
                 with tf.device('/cpu'):
-                    model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+                    model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                 vocabsize = vocab_size, 
                                                 lstmunits= int(best_arch[0]), 
                                                 denseunits = int(best_arch[1]), 
                                                 embedding = int(best_arch[2]))
             print("Best model summary:\n")
-            print(model.summary())
+            print(model_train.summary())
             print("\n")
-            multi_model = smimodel.ModelMGPU(model, gpus=n_gpus, bridge_type=bridge_type)
+            multi_model = model.ModelMGPU(model_train, gpus=n_gpus, bridge_type=bridge_type)
         else:
-            model = smimodel.LSTMAttModel.create(inputtokens = max_length+1, 
+            model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                         vocabsize = vocab_size, 
                                         lstmunits= int(best_arch[0]), 
                                         denseunits = int(best_arch[1]), 
                                         embedding = int(best_arch[2]))
 
             print("Best model summary:\n")
-            print(model.summary())
+            print(model_train.summary())
             print("\n")
-            multi_model = model
+            multi_model = model_train
 
         batch_size = int(best_arch[3])
         custom_adam = Adam(lr=math.pow(10,-float(best_arch[4])))
@@ -400,9 +400,9 @@ def Main(data,
         print("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
 
         print("***Predictions from the best model.***\n")
-        model.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
+        model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
 #         model.save(save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')  
-        model.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
+        model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
         # predict and compare for the training, validation and test sets
         x_train_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_enum_tokens, 
@@ -415,9 +415,9 @@ def Main(data,
                                                      max_length = max_length+1, 
                                                      vocab = tokens)
 
-        y_pred_train = model.predict(x_train_enum_tokens_tointvec)
-        y_pred_valid = model.predict(x_valid_enum_tokens_tointvec)
-        y_pred_test = model.predict(x_test_enum_tokens_tointvec)
+        y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
+        y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)
+        y_pred_test = model_train.predict(x_test_enum_tokens_tointvec)
 
         # compute a mean per set of augmented SMILES
         y_pred_train_mean, _ = utils.mean_median_result(x_train_enum_card, y_pred_train)
