@@ -117,7 +117,7 @@ def TokensFinder(data,
                  data_name, 
                  data_units = '',
                  k_fold_number = 8,
-                 k_fold_index=0,
+                 k_fold_index = 0,
                  augmentation = False, 
                  token_tofind = '', 
                  verbose = 1):
@@ -125,18 +125,17 @@ def TokensFinder(data,
     print("***SMILES_X token's finder starts...***\n\n")
     np.random.seed(seed=123)
     seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
-    # Train/validation/test data splitting - 80/10/10 % at random with diff. seeds for k_fold_number times
-    selection_seed = seed_list[k_fold_index]
-        
+    
     print("******")
-    print("***Fold #{} initiated...***".format(selection_seed))
+    print("***Fold #{} initiated...***".format(k_fold_index))
     print("******")
 
     print("***Sampling and splitting of the dataset.***\n")
+    # Reproducing the data split of the requested fold (k_fold_index)
     x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
     utils.random_split(smiles_input=data.smiles, 
                        prop_input=np.array(data.iloc[:,1]), 
-                       random_state=selection_seed, 
+                       random_state=seed_list[k_fold_index], 
                        scaling = True)
     
     # data augmentation or not
