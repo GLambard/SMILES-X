@@ -152,11 +152,10 @@ def Main(data,
         print("******")
         
         print("***Sampling and splitting of the dataset.***\n")
-        selection_seed = seed_list[ifold]
         x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
         utils.random_split(smiles_input=data.smiles, 
                            prop_input=np.array(data.iloc[:,1]), 
-                           random_state=selection_seed, 
+                           random_state=seed_list[ifold], 
                            scaling = True)
               
         # data augmentation or not
@@ -217,9 +216,9 @@ def Main(data,
         print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
         
         # Save the vocabulary for re-use
-        token.save_vocab(tokens, save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt')
+        token.save_vocab(tokens, save_dir+data_name+'_tokens_set_fold_'+str(ifold)+'.txt')
         # Tokens as a list
-        tokens = token.get_vocab(save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt')
+        tokens = token.get_vocab(save_dir+data_name+'_tokens_set_fold_'+str(ifold)+'.txt')
         # Add 'pad', 'unk' tokens to the existing list
         tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
         
@@ -355,7 +354,7 @@ def Main(data,
         multi_model.compile(loss="mse", optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
         
         # Checkpoint, Early stopping and callbacks definition
-        filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5'
+        filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5'
         
         checkpoint = ModelCheckpoint(filepath, 
                                      monitor='val_loss', 
@@ -394,14 +393,13 @@ def Main(data,
         plt.ylabel('Loss')
         plt.xlabel('Epoch')
         plt.legend(['Train', 'Validation'], loc='upper right')
-        plt.savefig(save_dir+'History_fit_LSTMAtt_'+data_name+'_model_weights.best_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+        plt.savefig(save_dir+'History_fit_LSTMAtt_'+data_name+'_model_weights.best_fold_'+str(ifold)+'.png', bbox_inches='tight')
         plt.close()
         
         print("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
 
         print("***Predictions from the best model.***\n")
-        model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
-#         model.save(save_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')  
+        model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
         model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
         # predict and compare for the training, validation and test sets
@@ -520,5 +518,5 @@ def Main(data,
         plt.legend()
 
         # Added fold number
-        plt.savefig(save_dir+'TrainValid_Plot_LSTMAtt_'+data_name+'_model_weights.best_seed_'+str(selection_seed)+'_fold_'+str(ifold)+'.png', bbox_inches='tight', dpi=80)
+        plt.savefig(save_dir+'TrainValid_Plot_LSTMAtt_'+data_name+'_model_weights.best_fold_'+str(ifold)+'.png', bbox_inches='tight', dpi=80)
         plt.close()

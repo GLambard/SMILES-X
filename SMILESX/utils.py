@@ -17,7 +17,7 @@ np.set_printoptions(precision=3)
 #         3 arrays of properties for training, validation, test: y_train, y_valid, y_test, 
 #         the scaling function: scaler
 def random_split(smiles_input, prop_input, random_state, scaling = True):
-
+    np.random.seed(seed=random_state)
     full_idx = np.array([x for x in range(smiles_input.shape[0])])
     train_idx = np.random.choice(full_idx, 
                                  size=math.ceil(0.8*smiles_input.shape[0]), 
