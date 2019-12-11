@@ -46,18 +46,17 @@ def Embedding_Vis(data,
     print("***SMILES_X for embedding visualization starts...***\n\n")
     np.random.seed(seed=123)
     seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
-    # Train/validation/test data splitting - 80/10/10 % at random with diff. seeds for k_fold_number times
-    selection_seed = seed_list[k_fold_index]
         
     print("******")
-    print("***Fold #{} initiated...***".format(selection_seed))
+    print("***Fold #{} initiated...***".format(k_fold_index))
     print("******")
 
     print("***Sampling and splitting of the dataset.***\n")
+    # Reproducing the data split of the requested fold (k_fold_index)
     x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
     utils.random_split(smiles_input=data.smiles, 
                        prop_input=np.array(data.iloc[:,1]), 
-                       random_state=selection_seed, 
+                       random_state=seed_list[k_fold_index], 
                        scaling = True)
   
     # data augmentation or not
@@ -103,6 +102,7 @@ def Embedding_Vis(data,
     
     # Tokens as a list
     tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
+
     # Add 'pad', 'unk' tokens to the existing list
     tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
     
@@ -116,7 +116,7 @@ def Embedding_Vis(data,
     token_to_int = token.get_tokentoint(tokens)
     int_to_token = token.get_inttotoken(tokens)
 
-    model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
+    model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(k_fold_index)+'.hdf5', 
                              custom_objects={'AttentionM': model.AttentionM()})
 
     print("Chosen model summary:\n")
@@ -183,6 +183,6 @@ def Embedding_Vis(data,
     plt.yticks([])
     ax.axis('tight')
     
-    plt.savefig(save_dir+'Visualization_'+data_name+'_Embedding_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+    plt.savefig(save_dir+'Visualization_'+data_name+'_Embedding_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
     plt.show()
 ##

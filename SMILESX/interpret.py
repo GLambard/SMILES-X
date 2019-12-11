@@ -67,18 +67,17 @@ def Interpretation(data,
     print("***SMILES_X Interpreter starts...***\n\n")
     np.random.seed(seed=123)
     seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
-    # Train/validation/test data splitting - 80/10/10 % at random with diff. seeds for k_fold_number times
-    selection_seed = seed_list[k_fold_index]
         
     print("******")
-    print("***Fold #{} initiated...***".format(selection_seed))
+    print("***Fold #{} initiated...***".format(k_fold_index))
     print("******")
 
     print("***Sampling and splitting of the dataset.***\n")
+    # Reproducing the data split of the requested fold (k_fold_index)
     x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
     utils.random_split(smiles_input=data.smiles, 
                        prop_input=np.array(data.iloc[:,1]), 
-                       random_state=selection_seed, 
+                       random_state=seed_list[k_fold_index], 
                        scaling = True)
 
     np.savetxt(save_dir+'smiles_train.txt', np.asarray(x_train), newline="\n", fmt='%s')
@@ -146,6 +145,7 @@ def Interpretation(data,
     
     # Tokens as a list
     tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
+
     # Add 'pad', 'unk' tokens to the existing list
     tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
     
@@ -160,7 +160,7 @@ def Interpretation(data,
     int_to_token = token.get_inttotoken(tokens)
 
     # Best architecture to visualize from
-    model_topredict = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5', 
+    model_topredict = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(k_fold_index)+'.hdf5', 
                                           custom_objects={'AttentionM': model.AttentionM()})
     best_arch = [model_topredict.layers[2].output_shape[-1]/2, 
                  model_topredict.layers[3].output_shape[-1], 
@@ -179,7 +179,7 @@ def Interpretation(data,
     print("\n")
 
     print("***Interpretation from the best model.***\n")
-    model_att.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(selection_seed)+'.hdf5')
+    model_att.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(k_fold_index)+'.hdf5')
     model_att.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
     smiles_toviz_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list= smiles_toviz_x_enum_tokens, 
@@ -210,7 +210,7 @@ def Interpretation(data,
                fontsize = font_size, 
                rotation = font_rotation)
     plt.yticks([])
-    plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+    plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
     #plt.show()
     
     smiles_tmp = smiles_toviz_x_enum[ienumcard]
@@ -233,7 +233,7 @@ def Interpretation(data,
                                       colorMap='Reds', 
                                       contourLines = 10,
                                       alpha = 0.25)
-    fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+    fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
     #fig.show()
     
     model_topredict.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
@@ -276,7 +276,7 @@ def Interpretation(data,
                rotation = font_rotation)
     plt.yticks(fontsize = 20)
     plt.ylabel('Temporal relative distance', fontsize = 25, labelpad = 15)
-    plt.savefig(save_dir+'Interpretation_temporal_'+data_name+'_seed_'+str(selection_seed)+'.png', bbox_inches='tight')
+    plt.savefig(save_dir+'Interpretation_temporal_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
     #plt.show()
 ##
 

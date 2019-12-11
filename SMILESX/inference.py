@@ -44,9 +44,6 @@ def Inference(data_name,
     os.makedirs(save_dir, exist_ok=True)
     
     print("***SMILES_X for inference starts...***\n\n")
-    np.random.seed(seed=123)
-    seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
-        
     print("***Checking the SMILES list for inference***\n")
     smiles_checked = list()
     smiles_rejected = list()
@@ -96,6 +93,7 @@ def Inference(data_name,
         
         # Tokens as a list
         tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
+
         # Add 'pad', 'unk' tokens to the existing list
         vocab_size = len(tokens)
         tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
@@ -105,7 +103,7 @@ def Inference(data_name,
         int_to_token = token.get_inttotoken(tokens)
         
         # Best architecture to visualize from
-        model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_seed_'+str(seed_list[ifold])+'.hdf5', 
+        model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
                                  custom_objects={'AttentionM': model.AttentionM()})
 
         if ifold == 0:
