@@ -145,7 +145,7 @@ def Interpretation(data,
     train_unique_tokens.insert(0,'pad')
     
     # Tokens as a list
-    tokens = token.get_vocab(input_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt')
+    tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
     # Add 'pad', 'unk' tokens to the existing list
     tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
     

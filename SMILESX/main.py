@@ -194,12 +194,12 @@ def Main(data,
         all_smiles_tokens = x_train_enum_tokens+x_valid_enum_tokens+x_test_enum_tokens
 
         # Check if the vocabulary for current dataset exists already
-        if os.path.exists(save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt')):
-            tokens = token.get_vocab(save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt'))
+        if os.path.exists(save_dir+data_name+'_Vocabulary.txt'):
+            tokens = token.get_vocab(save_dir+data_name+'_Vocabulary.txt')
         else:
             tokens = token.extract_vocab(all_smiles_tokens)
-            token.save_vocab(tokens, save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt'))
-            tokens = token.get_vocab(save_dir+data_name+'_tokens_set_seed'+str(selection_seed)+'.txt'))
+            token.save_vocab(tokens, save_dir+data_name+'_Vocabulary.txt')
+            tokens = token.get_vocab(save_dir+data_name+'_Vocabulary.txt')
 
         vocab_size = len(tokens)
         
