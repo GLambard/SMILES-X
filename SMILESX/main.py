@@ -191,7 +191,15 @@ def Main(data,
         
         # Vocabulary size computation
         all_smiles_tokens = x_train_enum_tokens+x_valid_enum_tokens+x_test_enum_tokens
-        tokens = token.extract_vocab(all_smiles_tokens)
+
+        # Check if the vocabulary for current dataset exists already
+        if os.path.exists(save_dir+data_name+'_Vocabulary.txt'):
+            tokens = token.get_vocab(save_dir+data_name+'_Vocabulary.txt')
+        else:
+            tokens = token.extract_vocab(all_smiles_tokens)
+            token.save_vocab(tokens, save_dir+data_name+'_Vocabulary.txt')
+            tokens = token.get_vocab(save_dir+data_name+'_Vocabulary.txt')
+
         vocab_size = len(tokens)
         
         train_unique_tokens = token.extract_vocab(x_train_enum_tokens)
@@ -215,10 +223,6 @@ def Main(data,
         
         print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
         
-        # Save the vocabulary for re-use
-        token.save_vocab(tokens, save_dir+data_name+'_tokens_set_fold_'+str(ifold)+'.txt')
-        # Tokens as a list
-        tokens = token.get_vocab(save_dir+data_name+'_tokens_set_fold_'+str(ifold)+'.txt')
         # Add 'pad', 'unk' tokens to the existing list
         tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
         
@@ -226,11 +230,7 @@ def Main(data,
         max_length = np.max([len(ismiles) for ismiles in all_smiles_tokens])
         print("Maximum length of tokenized SMILES: {} tokens (termination spaces included)\n".format(max_length))
         
-        print("***Bayesian Optimization of the SMILESX's architecture.***\n")
-        # Transformation of tokenized SMILES to vector of intergers and vice-versa
-        token_to_int = token.get_tokentoint(tokens)
-        int_to_token = token.get_inttotoken(tokens)
-        
+        print("***Bayesian Optimization of the SMILESX's architecture.***\n")        
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
             def create_mod(params):

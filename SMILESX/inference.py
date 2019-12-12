@@ -92,7 +92,8 @@ def Inference(data_name,
     for ifold in range(k_fold_number):
         
         # Tokens as a list
-        tokens = token.get_vocab(input_dir+data_name+'_tokens_set_fold_'+str(ifold)+'.txt')
+        tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
+
         # Add 'pad', 'unk' tokens to the existing list
         vocab_size = len(tokens)
         tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
