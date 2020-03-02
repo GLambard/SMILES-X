@@ -3,6 +3,7 @@ import os
 import math
 
 import matplotlib.pyplot as plt
+%matplotlib inline
 
 from numpy.random import seed
 seed(12345)
@@ -27,8 +28,9 @@ np.set_printoptions(precision=3)
 # To manage GPU usage and memory growth
 # ngpus: number of GPUs to be used (Default: 1)
 # gpus_list: list of GPU IDs to be used (Default: None), e.g. ['0','1','2']
+# gpus_debug: print out the GPUs ongoing usage 
 # If gpus_list and ngpus are both provided, gpus_list prevails
-def set_gpuoptions(ngpus = 1, gpus_list = None):
+def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
     
     if gpus_list is not None:
         gpu_ids = ','.join(gpus_list)
@@ -46,13 +48,26 @@ def set_gpuoptions(ngpus = 1, gpus_list = None):
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
             logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs detected and configured.")
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
+    
+    gpus_list_len = len(gpus)
+    if gpus_list_len > 0:
+        if gpus_list_len > 1: 
+            strategy = tf.distribute.MirroredStrategy()
+        else: 
+            strategy = tf.distribute.OneDeviceStrategy()
+        print ('{} GPU devices will be used.'.format(strategy.num_replicas_in_sync))
+    else:
+        print("No GPU is detected in the system. SMILES-X needs at least one GPU to proceed.")
+        break
             
-# To find out which devices your operations and tensors are assigned to
-tf.debugging.set_log_device_placement(True)
+    # To find out which devices your operations and tensors are assigned to
+    tf.debugging.set_log_device_placement(gpus_debug)
+    
+    return strategy
 ##
 
 ## Data sequence to be fed to the neural network during training through batches of data
@@ -118,6 +133,8 @@ class DataSequence(Sequence):
 # batch_size_ref: batch size for neural architecture training if Bayesian architecture search is off
 # alpha_ref: 10^(-alpha_ref) Adam's learning rate for neural architecture training if Bayesian architecture search is off
 # n_gpus: number of GPUs to be used in parallel (Default: 1)
+# gpus_list: list of GPU IDs to be used (Default: None), e.g. ['0','1','2']
+# gpus_debug: print out the GPUs ongoing usage 
 # bridge_type: bridge's type to be used by GPUs (e.g. 'NVLink' or 'None') (Default: 'None')
 # patience: number of epochs to respect before stopping a training after minimal validation's error (Default: 25)
 # n_epochs: maximum of epochs for training (Default: 1000)
@@ -146,9 +163,17 @@ def Main(data,
          batch_size_ref = 64, 
          alpha_ref = 3, 
          n_gpus = 1, 
+         gpus_list = None, 
+         gpus_debug = False, 
          bridge_type = 'None', 
          patience = 25, 
          n_epochs = 1000):
+    
+    # Set-up GPUs options
+    strategy = set_gpuoptions(n_gpus = n_gpus, 
+                              gpus_list = gpus_list, 
+                              gpus_debug = gpus_debug)
+    ##
     
     if augmentation:
         p_dir_temp = 'Augm'
@@ -256,52 +281,33 @@ def Main(data,
                 model_tag = data_name
 
                 K.clear_session()
-
-                if n_gpus > 1:
-                    if bridge_type == 'NVLink':
-                        model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                              vocabsize = vocab_size, 
-                                                              lstmunits=int(params[:,0][0]), 
-                                                              denseunits = int(params[:,1]), 
-                                                              embedding = int(params[:,2][0]))
-                    else:
-                        with tf.device('/cpu'): # necessary to multi-GPU scaling
-                            model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                                  vocabsize = vocab_size, 
-                                                                  lstmunits=int(params[:,0][0]), 
-                                                                  denseunits = int(params[:,1]), 
-                                                                  embedding = int(params[:,2][0]))
-                            
-                    multi_model = model.ModelMGPU(model_opt, gpus=n_gpus, bridge_type=bridge_type)
-                else: # single GPU
+                
+                with strategy.scope():
                     model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                           vocabsize = vocab_size, 
                                                           lstmunits=int(params[:,0][0]), 
                                                           denseunits = int(params[:,1]), 
                                                           embedding = int(params[:,2][0]))
-                    
-                    multi_model = model_opt
 
-                batch_size = int(params[:,3][0])
-                custom_adam = Adam(lr=math.pow(10,-float(params[:,4][0])))
-                multi_model.compile(loss='mse', optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
+                    batch_size = int(params[:,3][0]) * strategy.num_replicas_in_sync
+                    custom_adam = Adam(lr=math.pow(10,-float(params[:,4][0])))
+                    model_opt.compile(loss='mse', optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
 
-                history = multi_model.fit_generator(generator = DataSequence(x_train_enum_tokens,
-                                                                             vocab = tokens, 
-                                                                             max_length = max_length, 
-                                                                             props_set = y_train_enum, 
-                                                                             batch_size = batch_size), 
-                                                                             steps_per_epoch = math.ceil(len(x_train_enum_tokens)/batch_size)//bayopt_it_factor, 
-                                                    validation_data = DataSequence(x_valid_enum_tokens,
-                                                                                   vocab = tokens, 
-                                                                                   max_length = max_length, 
-                                                                                   props_set = y_valid_enum, 
-                                                                                   batch_size = min(len(x_valid_enum_tokens), batch_size)),
-                                                    validation_steps = math.ceil(len(x_valid_enum_tokens)/min(len(x_valid_enum_tokens), batch_size))//bayopt_it_factor, 
-                                                    epochs = bayopt_n_epochs, 
-                                                    shuffle = True,
-                                                    initial_epoch = 0, 
-                                                    verbose = 0)
+                history = model_opt.fit_generator(generator = DataSequence(x_train_enum_tokens,
+                                                                           vocab = tokens, 
+                                                                           max_length = max_length, 
+                                                                           props_set = y_train_enum, 
+                                                                           batch_size = batch_size), 
+                                                                           steps_per_epoch = math.ceil(len(x_train_enum_tokens)/batch_size)//bayopt_it_factor, 
+                                                  validation_data = DataSequence(x_valid_enum_tokens,
+                                                                                 vocab = tokens, 
+                                                                                 max_length = max_length, 
+                                                                                 props_set = y_valid_enum, 
+                                                                                 batch_size = min(len(x_valid_enum_tokens), batch_size)),
+                                                  validation_steps = math.ceil(len(x_valid_enum_tokens)/min(len(x_valid_enum_tokens), batch_size))//bayopt_it_factor, 
+                                                  epochs = bayopt_n_epochs, 
+                                                  shuffle = True,
+                                                  verbose = 0)
 
                 best_epoch = np.argmin(history.history['val_loss'])
                 mae_valid = history.history['val_mean_absolute_error'][best_epoch]
@@ -335,40 +341,21 @@ def Main(data,
         # Train the model and predict
         K.clear_session()   
         # Define the multi-gpus model if necessary
-        if n_gpus > 1:
-            if bridge_type == 'NVLink':
-                model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                        vocabsize = vocab_size, 
-                                                        lstmunits= int(best_arch[0]), 
-                                                        denseunits = int(best_arch[1]), 
-                                                        embedding = int(best_arch[2]))
-            else:
-                with tf.device('/cpu'):
-                    model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                            vocabsize = vocab_size, 
-                                                            lstmunits= int(best_arch[0]), 
-                                                            denseunits = int(best_arch[1]), 
-                                                            embedding = int(best_arch[2]))
-            print("Best model summary:\n")
-            print(model_train.summary())
-            print("\n")
-            multi_model = model.ModelMGPU(model_train, gpus=n_gpus, bridge_type=bridge_type)
-        else:
+        with strategy.scope():
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                     vocabsize = vocab_size, 
                                                     lstmunits= int(best_arch[0]), 
                                                     denseunits = int(best_arch[1]), 
                                                     embedding = int(best_arch[2]))
-
-            print("Best model summary:\n")
-            print(model_train.summary())
-            print("\n")
-            multi_model = model_train
-
-        batch_size = int(best_arch[3])
-        custom_adam = Adam(lr=math.pow(10,-float(best_arch[4])))
-        # Compile the model
-        multi_model.compile(loss="mse", optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
+            
+            batch_size = int(best_arch[3]) * strategy.num_replicas_in_sync
+            custom_adam = Adam(lr=math.pow(10,-float(best_arch[4])))
+            # Compile the model
+            model_train.compile(loss="mse", optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
+            
+        print("Best model summary:\n")
+        print(model_train.summary())
+        print("\n")
         
         # Checkpoint, Early stopping and callbacks definition
         filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5'
@@ -388,7 +375,7 @@ def Main(data,
         callbacks_list = [checkpoint, earlystopping]
 
         # Fit the model
-        history = multi_model.fit_generator(generator = DataSequence(x_train_enum_tokens,
+        history = model_train.fit_generator(generator = DataSequence(x_train_enum_tokens,
                                                                      vocab = tokens, 
                                                                      max_length = max_length, 
                                                                      props_set = y_train_enum, 
@@ -400,7 +387,6 @@ def Main(data,
                                                                            batch_size = min(len(x_valid_enum_tokens), batch_size)),
                                             epochs = n_epochs, 
                                             shuffle = True,
-                                            initial_epoch = 0, 
                                             callbacks = callbacks_list)
 
         # Summarize history for losses per epoch
