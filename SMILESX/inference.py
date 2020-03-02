@@ -4,19 +4,10 @@ import os
 
 from rdkit import Chem
 
-from keras.models import load_model
-from keras import backend as K
-from keras import metrics
-import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras import metrics
 
 from SMILESX import utils, model, token, augm
-
-##
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-config.log_device_placement = True  # to log device placement (on which device the operation ran)
-sess = tf.Session(config=config)
-K.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
 ## Inference on the SMILESX predictions
 # smiles_list: targeted SMILES list for property inference (Default: ['CC','CCC','C=O'])

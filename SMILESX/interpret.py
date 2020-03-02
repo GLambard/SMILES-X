@@ -11,20 +11,10 @@ from sklearn.preprocessing import MinMaxScaler
 from rdkit import Chem
 from rdkit.Chem import Draw
 
-from keras.models import Model
-from keras.models import load_model
-from keras import metrics
-from keras import backend as K
-import tensorflow as tf
+from tensorflow.keras.models import Model, load_model
+from tensorflow.keras import metrics
 
 from SMILESX import utils, model, token, augm
-
-##
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-config.log_device_placement = True  # to log device placement (on which device the operation ran)
-sess = tf.Session(config=config)
-K.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
 ## Interpretation of the SMILESX predictions
 # data: provided data (numpy array of: (SMILES, property))
@@ -211,7 +201,6 @@ def Interpretation(data,
                rotation = font_rotation)
     plt.yticks([])
     plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-    #plt.show()
     
     smiles_tmp = smiles_toviz_x_enum[ienumcard]
     mol_tmp = Chem.MolFromSmiles(smiles_tmp)
@@ -234,7 +223,6 @@ def Interpretation(data,
                                       contourLines = 10,
                                       alpha = 0.25)
     fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-    #fig.show()
     
     model_topredict.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
     
@@ -277,7 +265,6 @@ def Interpretation(data,
     plt.yticks(fontsize = 20)
     plt.ylabel('Temporal relative distance', fontsize = 25, labelpad = 15)
     plt.savefig(save_dir+'Interpretation_temporal_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-    #plt.show()
 ##
 
 

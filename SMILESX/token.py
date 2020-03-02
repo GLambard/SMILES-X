@@ -2,7 +2,7 @@ import numpy as np
 import ast
 
 from SMILESX import utils, augm
-from keras import backend as K
+from tensorflow.keras import backend as K
 # import tensorflow as tf
 
 # #from keras.backend.tensorflow_backend import set_session

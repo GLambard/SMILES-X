@@ -2,8 +2,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from keras.models import load_model
-from keras import metrics
+from tensorflow.keras.model import load_model
+from tensorflow.keras import metrics
 
 from sklearn.decomposition import PCA
 from sklearn.cluster import AffinityPropagation

@@ -1,10 +1,6 @@
 import numpy as np
 import os
 import math
-# For fixing the GPU in use
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
-# The GPU id to use (e.g. "0", "1", etc.)
-os.environ["CUDA_VISIBLE_DEVICES"]="0";
 
 import matplotlib.pyplot as plt
 
@@ -13,11 +9,11 @@ seed(12345)
 
 import GPy, GPyOpt
 
-from keras.utils import Sequence
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras import metrics
-from keras import backend as K
+from tensorflow.keras.utils import Sequence
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras import metrics
+from tensorflow.keras import backend as K
 import tensorflow as tf
 import multiprocessing
 
@@ -26,17 +22,38 @@ from sklearn.metrics import r2_score
 from SMILESX import utils, token, augm, model
 
 np.set_printoptions(precision=3)
-# 
-# from sklearn.manifold import TSNE
-# from keras.utils import np_utils
 
 ##
-#from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-config.log_device_placement = True  # to log device placement (on which device the operation ran)
-sess = tf.Session(config=config)
-K.set_session(sess)  # set this TensorFlow session as the default session for Keras
+# To manage GPU usage and memory growth
+# ngpus: number of GPUs to be used (Default: 1)
+# gpus_list: list of GPU IDs to be used (Default: None), e.g. ['0','1','2']
+# If gpus_list and ngpus are both provided, gpus_list prevails
+def set_gpuoptions(ngpus = 1, gpus_list = None):
+    
+    if gpus_list is not None:
+        gpu_ids = ','.join(gpus_list)
+    else:
+        gpu_ids = ','.join([str(iid) for iid in range(ngpus)])
+    # For fixing the GPU in use
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
+    # The GPU id to use (e.g. "0", "1", etc.)
+    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(gpu_ids);
+        
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
+            
+# To find out which devices your operations and tensors are assigned to
+tf.debugging.set_log_device_placement(True)
+##
 
 ## Data sequence to be fed to the neural network during training through batches of data
 class DataSequence(Sequence):

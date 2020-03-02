@@ -1,23 +1,9 @@
-from keras.models import Model
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, Embedding, Bidirectional, TimeDistributed, LSTM
+#from tensorflow.compat.v1.keras.layers import CuDNNLSTM
+from tensorflow.keras.layers import Layer
 
-from keras.layers import Input, Dense
-from keras.layers import Embedding
-from keras.layers.wrappers import Bidirectional
-from keras.layers import CuDNNLSTM, TimeDistributed
-
-from keras.engine.topology import Layer
-
-from keras.utils import multi_gpu_model
-
-from keras import backend as K
-# import tensorflow as tf
-
-# #from keras.backend.tensorflow_backend import set_session
-# config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-# config.log_device_placement = True  # to log device placement (on which device the operation ran)
-# sess = tf.Session(config=config)
-# K.set_session(sess)  # set this TensorFlow session as the default session for Keras
+from tensorflow.keras import backend as K
 
 ## Custom attention layer
 # modified from https://github.com/sujitpal/eeap-examples
@@ -103,7 +89,7 @@ class LSTMAttModel():
                         input_length=inputtokens)(input_)
 
         # Bidirectional LSTM layer
-        net = Bidirectional(CuDNNLSTM(lstmunits, return_sequences=True))(net)
+        net = Bidirectional(LSTM(lstmunits, return_sequences=True))(net)
         net = TimeDistributed(Dense(denseunits))(net)
         net = AttentionM(return_probabilities=return_proba)(net)
 
@@ -112,31 +98,4 @@ class LSTMAttModel():
         model = Model(inputs=input_, outputs=net)
 
         return model
-##
-
-## Function to fit a model on a multi-GPU machine
-class ModelMGPU(Model):
-    # Initialization
-    # ser_model: based model to pass to >1 GPUs
-    # gpus: number of GPUs
-    # bridge_type: optimize for bridge types (NVLink or not) 
-    # returns:
-    #         a multi-GPU model (based model copied to GPUs, batch is splitted over the GPUs)
-    def __init__(self, ser_model, gpus, bridge_type):
-        if bridge_type == 'NVLink':
-            pmodel = multi_gpu_model(ser_model, gpus, cpu_merge=False) # recommended for NV-link
-        else:
-            pmodel = multi_gpu_model(ser_model, gpus)
-        self.__dict__.update(pmodel.__dict__)
-        self._smodel = ser_model
-
-    def __getattribute__(self, attrname):
-        '''Override load and save methods to be used from the serial-model. The
-        serial-model holds references to the weights in the multi-gpu model.
-        '''
-        # return Model.__getattribute__(self, attrname)
-        if 'load' in attrname or 'save' in attrname:
-            return getattr(self._smodel, attrname)
-
-        return super(ModelMGPU, self).__getattribute__(attrname)
 ##
