@@ -2,6 +2,14 @@ import pandas as pd
 import numpy as np
 import math
 
+from rdkit import Chem
+# Disables RDKit whiny logging.
+import rdkit.rdBase as rkrb
+import rdkit.RDLogger as rkl
+logger = rkl.logger()
+logger.setLevel(rkl.ERROR)
+rkrb.DisableLog('rdApp.error')
+
 from sklearn.preprocessing import RobustScaler
 from scipy.ndimage.interpolation import shift
 

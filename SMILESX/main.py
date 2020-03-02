@@ -3,7 +3,6 @@ import os
 import math
 
 import matplotlib.pyplot as plt
-%matplotlib inline
 
 from numpy.random import seed
 seed(12345)
@@ -18,10 +17,12 @@ from tensorflow.keras import backend as K
 import tensorflow as tf
 import multiprocessing
 
+from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score
 
 from SMILESX import utils, token, augm, model
 
+np.random.seed(seed=123)
 np.set_printoptions(precision=3)
 
 ##
@@ -60,14 +61,14 @@ def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
         else: 
             strategy = tf.distribute.OneDeviceStrategy()
         print ('{} GPU devices will be used.'.format(strategy.num_replicas_in_sync))
+        
+        # To find out which devices your operations and tensors are assigned to
+        tf.debugging.set_log_device_placement(gpus_debug)
+        
+        return strategy
     else:
         print("No GPU is detected in the system. SMILES-X needs at least one GPU to proceed.")
-        break
-            
-    # To find out which devices your operations and tensors are assigned to
-    tf.debugging.set_log_device_placement(gpus_debug)
-    
-    return strategy
+        return None
 ##
 
 ## Data sequence to be fed to the neural network during training through batches of data
@@ -135,7 +136,6 @@ class DataSequence(Sequence):
 # n_gpus: number of GPUs to be used in parallel (Default: 1)
 # gpus_list: list of GPU IDs to be used (Default: None), e.g. ['0','1','2']
 # gpus_debug: print out the GPUs ongoing usage 
-# bridge_type: bridge's type to be used by GPUs (e.g. 'NVLink' or 'None') (Default: 'None')
 # patience: number of epochs to respect before stopping a training after minimal validation's error (Default: 25)
 # n_epochs: maximum of epochs for training (Default: 1000)
 # returns:
@@ -165,7 +165,6 @@ def Main(data,
          n_gpus = 1, 
          gpus_list = None, 
          gpus_debug = False, 
-         bridge_type = 'None', 
          patience = 25, 
          n_epochs = 1000):
     
@@ -173,6 +172,8 @@ def Main(data,
     strategy = set_gpuoptions(n_gpus = n_gpus, 
                               gpus_list = gpus_list, 
                               gpus_debug = gpus_debug)
+    if strategy is None:
+        return
     ##
     
     if augmentation:
@@ -184,10 +185,13 @@ def Main(data,
     os.makedirs(save_dir, exist_ok=True)
         
     print("***SMILES_X starts...***\n\n")
-    np.random.seed(seed=123)
-    seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
-    # Train/validation/test data splitting - 80/10/10 % at random with diff. seeds for k_fold_number times
-    for ifold in range(k_fold_number):
+    
+    # Setting up the cross_validation on k-folds
+    kf = KFold(n_splits=k_fold_number, random_state=123, shuffle=True)
+    data_smiles = data.smiles.values
+    data_prop = np.array(data.iloc[:,1])
+    kf.get_n_splits(data_smiles)
+    for ifold, (train_index, test_index) in enumerate(kf.split(data_smiles)):
         
         print("******")
         print("***Fold #{} initiated...***".format(ifold))
