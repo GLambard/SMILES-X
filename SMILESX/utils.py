@@ -7,6 +7,27 @@ from scipy.ndimage.interpolation import shift
 
 np.set_printoptions(precision=3)
 
+## SMILES RDKit checker 
+# dataframe: provided dataframe with SMILES (column name: 'smiles') to check
+# returns:
+#         a dataframe with SMILES which passed the check
+#         a list of SMILES which did not pass the check
+def check_smiles(dataframe):
+    smiles_veto = []
+    bad_smiles_list = []
+    for ismiles in dataframe.smiles:
+        pass_tmp = True # True is an accepted molecule
+        try:
+            smi_tmp = Chem.MolToSmiles(Chem.MolFromSmiles(ismiles))
+        except:
+            pass_tmp = False
+            bad_smiles_list.append(ismiles)
+        smiles_veto.append(pass_tmp)
+        
+    dataframe = dataframe[smiles_veto].reset_index().iloc[:,1:]
+    return dataframe, bad_smiles_list
+##
+
 ## Train/Validation/Test random split
 # smiles_input: array of SMILES to split
 # prop_input: array of SMILES-associated property to split 
