@@ -195,7 +195,8 @@ def Main(data,
     ##
         
     print("***SMILES_X starts...***\n\n")
-    
+    # Setting up the seeds for models initialization
+    seed_list = np.random.randint(int(1e6), size = 10).tolist()
     # Setting up the cross_validation on k-folds
     kf = KFold(n_splits=k_fold_number, random_state=123, shuffle=True)
     data_smiles = data.smiles.values
