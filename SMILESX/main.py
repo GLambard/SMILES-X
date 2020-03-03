@@ -166,9 +166,9 @@ def Main(data,
          gpus_list = None, 
          gpus_debug = False, 
          patience = 25, 
-         n_epochs = 1000):
+         n_epochs = 100):
     
-    # Set-up GPUs options
+    # GPUs options
     strategy = set_gpuoptions(n_gpus = n_gpus, 
                               gpus_list = gpus_list, 
                               gpus_debug = gpus_debug)
@@ -176,43 +176,43 @@ def Main(data,
         return
     ##
     
+    # Data augmentation
     if augmentation:
         p_dir_temp = 'Augm'
+        print("***Data augmentation to {}***\n".format(augmentation))
+        canonical = False
+        rotation = True
     else:
         p_dir_temp = 'Can'
-        
+        print("***No data augmentation has been required.***\n")
+        canonical = True
+        rotation = False
+    ##
+      
+    # Output directory
     save_dir = outdir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
     os.makedirs(save_dir, exist_ok=True)
+    ##
         
     print("***SMILES_X starts...***\n\n")
     
     # Setting up the cross_validation on k-folds
     kf = KFold(n_splits=k_fold_number, random_state=123, shuffle=True)
     data_smiles = data.smiles.values
-    data_prop = np.array(data.iloc[:,1])
+    data_prop = data.iloc[:,1].values.reshape(-1,1)
     kf.get_n_splits(data_smiles)
-    for ifold, (train_index, test_index) in enumerate(kf.split(data_smiles)):
+    for ifold, (train_index, valid_test_index) in enumerate(kf.split(data_smiles)):
         
         print("******")
         print("***Fold #{} initiated...***".format(ifold))
         print("******")
         
-        print("***Sampling and splitting of the dataset.***\n")
+        print("***Splitting and standardization of the dataset.***\n")
         x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
-        utils.random_split(smiles_input=data.smiles, 
-                           prop_input=np.array(data.iloc[:,1]), 
-                           random_state=seed_list[ifold], 
-                           scaling = True)
-              
-        # data augmentation or not
-        if augmentation == True:
-            print("***Data augmentation to {}***\n".format(augmentation))
-            canonical = False
-            rotation = True
-        else:
-            print("***No data augmentation has been required.***\n")
-            canonical = True
-            rotation = False
+        utils.split_standardize(smiles_input = data_smiles, 
+                                prop_input = data_prop, 
+                                train_index = train_index, 
+                                valid_test_index = valid_test_index)
             
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
@@ -276,6 +276,17 @@ def Main(data,
         max_length = np.max([len(ismiles) for ismiles in all_smiles_tokens])
         print("Maximum length of tokenized SMILES: {} tokens (termination spaces included)\n".format(max_length))
         
+        # predict and compare for the training, validation and test sets
+        x_train_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_enum_tokens, 
+                                                            max_length = max_length+1, 
+                                                            vocab = tokens)
+        x_valid_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_valid_enum_tokens, 
+                                                            max_length = max_length+1, 
+                                                            vocab = tokens)
+        x_test_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_test_enum_tokens, 
+                                                           max_length = max_length+1, 
+                                                           vocab = tokens)
+        
         print("***Bayesian Optimization of the SMILESX's architecture.***\n")        
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
@@ -285,35 +296,20 @@ def Main(data,
                 model_tag = data_name
 
                 K.clear_session()
-                
                 with strategy.scope():
                     model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                           vocabsize = vocab_size, 
                                                           lstmunits=int(params[:,0][0]), 
                                                           denseunits = int(params[:,1]), 
-                                                          embedding = int(params[:,2][0]))
+                                                          embedding = int(params[:,2][0]), 
+                                                          seed = seed)
 
                     batch_size = int(params[:,3][0]) * strategy.num_replicas_in_sync
                     custom_adam = Adam(lr=math.pow(10,-float(params[:,4][0])))
                     model_opt.compile(loss='mse', optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
-
-                history = model_opt.fit_generator(generator = DataSequence(x_train_enum_tokens,
-                                                                           vocab = tokens, 
-                                                                           max_length = max_length, 
-                                                                           props_set = y_train_enum, 
-                                                                           batch_size = batch_size), 
-                                                                           steps_per_epoch = math.ceil(len(x_train_enum_tokens)/batch_size)//bayopt_it_factor, 
-                                                  validation_data = DataSequence(x_valid_enum_tokens,
-                                                                                 vocab = tokens, 
-                                                                                 max_length = max_length, 
-                                                                                 props_set = y_valid_enum, 
-                                                                                 batch_size = min(len(x_valid_enum_tokens), batch_size)),
-                                                  validation_steps = math.ceil(len(x_valid_enum_tokens)/min(len(x_valid_enum_tokens), batch_size))//bayopt_it_factor, 
-                                                  epochs = bayopt_n_epochs, 
-                                                  shuffle = True,
-                                                  verbose = 0)
-
-                best_epoch = np.argmin(history.history['val_loss'])
+                    
+                model_opt.predict()    
+                    
                 mae_valid = history.history['val_mean_absolute_error'][best_epoch]
                 mse_valid = history.history['val_mean_squared_error'][best_epoch]
                 if math.isnan(mse_valid): # discard diverging architectures (rare event)
@@ -408,17 +404,6 @@ def Main(data,
         print("***Predictions from the best model.***\n")
         model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
         model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
-
-        # predict and compare for the training, validation and test sets
-        x_train_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_enum_tokens, 
-                                                            max_length = max_length+1, 
-                                                            vocab = tokens)
-        x_valid_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_valid_enum_tokens, 
-                                                            max_length = max_length+1, 
-                                                            vocab = tokens)
-        x_test_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_test_enum_tokens, 
-                                                           max_length = max_length+1, 
-                                                           vocab = tokens)
 
         y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
         y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)

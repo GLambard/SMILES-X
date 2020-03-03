@@ -36,43 +36,31 @@ def check_smiles(dataframe):
     return dataframe, bad_smiles_list
 ##
 
-## Train/Validation/Test random split
+## Split into train, valid, test sets, and standardize the targeted property (mean 0, std 1)
 # smiles_input: array of SMILES to split
 # prop_input: array of SMILES-associated property to split 
-# random state: random seed for reproducibility
-# scaling: property scaling (mean = 0, s.d. = 1) (default: True)
+# train_index, valid_test_index: picked indices for training, validation and test 
 # returns: 
 #         3 arrays of smiles for training, validation, test: x_train, x_valid, x_test, 
 #         3 arrays of properties for training, validation, test: y_train, y_valid, y_test, 
 #         the scaling function: scaler
-def random_split(smiles_input, prop_input, random_state, scaling = True):
-    np.random.seed(seed=random_state)
-    full_idx = np.array([x for x in range(smiles_input.shape[0])])
-    train_idx = np.random.choice(full_idx, 
-                                 size=math.ceil(0.8*smiles_input.shape[0]), 
-                                 replace = False)
-    x_train = smiles_input[train_idx]
-    y_train = prop_input[train_idx].reshape(-1, 1)
+def split_standardize(smiles_input, prop_input, train_index, valid_test_index):
     
-    valid_test_idx = full_idx[np.isin(full_idx, train_idx, invert=True)]
-    valid_test_len = math.ceil(0.5*valid_test_idx.shape[0])
-    valid_idx = valid_test_idx[:valid_test_len]
-    test_idx = valid_test_idx[valid_test_len:]
-    x_valid = smiles_input[valid_idx]
-    y_valid = prop_input[valid_idx].reshape(-1, 1)
-    x_test = smiles_input[test_idx]
-    y_test = prop_input[test_idx].reshape(-1, 1)
+    x_train, x_valid_test = smiles_input[train_index], smiles_input[valid_test_index]
+    y_train, y_valid_test = prop_input[train_index], prop_input[valid_test_index]
+    valid_len = math.ceil(x_valid_test.shape[0]/2.)
+    x_valid, x_test = x_valid_test[:valid_len], x_valid_test[valid_len:]
+    y_valid, y_test = y_valid_test[:valid_len], y_valid_test[valid_len:]
     
-    if scaling == True:
-        scaler = RobustScaler(with_centering=True, 
-                              with_scaling=True, 
-                              quantile_range=(5.0, 95.0), 
-                              copy=True)
-        scaler_fit = scaler.fit(y_train)
-        print("Scaler: {}".format(scaler_fit))
-        y_train = scaler.transform(y_train)
-        y_valid = scaler.transform(y_valid)
-        y_test = scaler.transform(y_test)
+    scaler = RobustScaler(with_centering=True, 
+                          with_scaling=True, 
+                          quantile_range=(5.0, 95.0), 
+                          copy=True)
+    scaler_fit = scaler.fit(y_train)
+    print("Scaler: {}".format(scaler_fit))
+    y_train = scaler.transform(y_train)
+    y_valid = scaler.transform(y_valid)
+    y_test = scaler.transform(y_test)
     
     print("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n\n".format(\
                                       x_train.shape[0]/smiles_input.shape[0],\

@@ -3,65 +3,31 @@ import ast
 
 from SMILESX import utils, augm
 from tensorflow.keras import backend as K
-# import tensorflow as tf
-
-# #from keras.backend.tensorflow_backend import set_session
-# config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-# config.log_device_placement = True  # to log device placement (on which device the operation ran)
-# sess = tf.Session(config=config)
-# K.set_session(sess)  # set this TensorFlow session as the default session for Keras
+import re
 
 ## SMILES Tokenizer
 # smiles: input SMILES string to tokenize
 # returns:
 #         list of tokens + terminators in a SMILES
-
-# dictionary of tokens from http://opensmiles.org/opensmiles.html (Formal Grammar)
-aliphatic_organic = ['B','C','N','O','S','P','F','Cl','Br','I']
-aromatic_organic = ['b','c','n','o','s','p']
-bracket = ['[',']'] # includes isotope, symbol, chiral, hcount, charge, class
-bond = ['-','=','#','$','/','\\','.']
-lrb = ['%'] # long ring bonds '%TWODIGITS'
-terminator = [' '] # SPACE - start/end of SMILES
-wildcard = ['*']
-oov = ['oov'] # out-of-vocabulary tokens
-#
-
 def smiles_tokenizer(smiles):
-    smiles = smiles.replace('\n','') # avoid '\n' if exists in smiles
-    # '[...]' as single token
-    smiles = smiles.replace(bracket[0],' '+bracket[0]).replace(bracket[1],bracket[1]+' ')
-    # '%TWODIGITS' as single token
-    lrb_print = [smiles[ic:ic+3] for ic,ichar in enumerate(smiles) if ichar==lrb[0]]
-    if len(lrb_print)!=0:
-        for ichar in lrb_print:
-            smiles = smiles.replace(ichar, ' '+ichar+' ')
-    # split SMILES for [...] recognition
-    smiles = smiles.split(' ')
-    # split fragments other than [...]
-    splitted_smiles = list()
-    for ifrag in smiles:
-        ifrag_tag = False
-        for inac in bracket+lrb:
-            if inac in ifrag: 
-                ifrag_tag = True
-                break
-        if ifrag_tag == False:
-            # check for Cl, Br in alphatic branches to not dissociate letters (e.g. Cl -> C, l is prohibited)
-            for iaa in aliphatic_organic[7:9]:
-                ifrag = ifrag.replace(iaa, ' '+iaa+' ')
-            ifrag_tmp = ifrag.split(' ')
-            for iifrag_tmp in ifrag_tmp:
-                if iifrag_tmp!=aliphatic_organic[7] \
-                and iifrag_tmp!=aliphatic_organic[8]: # not 'Cl' and not 'Br'
-                    splitted_smiles.extend(iifrag_tmp) # automatic split char by char
-                else:
-                    splitted_smiles.extend([iifrag_tmp])
-        else:
-            splitted_smiles.extend([ifrag]) # keep the original token size
-    return terminator+splitted_smiles+terminator # add start + ... + end of SMILES
-##
+    # wildcard
+    # aliphatic_organic
+    # aromatic organic
+    # '[' isotope? symbol chiral? hcount? charge? class? ']'
+    # bonds
+    # ring bonds
+    # branch
+    # termination character ' '
+    patterns = "(\*|" +\
+               "N|O|S|P|F|Cl?|Br?|I|" +\
+               "b|c|n|o|s|p|" +\
+               "\[.*?\]|" +\
+               "-|=|#|\$|:|/|\\|\.|" +\
+               "[0-9]|\%[0-9]{2}|" +\
+               "\(|\))"
+    regex = re.compile(patterns)
+    tokens = [token for token in regex.findall(smiles)]
+    return [' '] + tokens + [' ']
 
 ## Get tokens from list of tokens from SMILES
 # smiles_array: array of SMILES to split as individual tokens
