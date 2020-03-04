@@ -93,3 +93,28 @@ def mean_median_result(x_cardinal_tmp, y_pred_tmp):
     
     return y_mean, y_med
 ##
+
+## Step decay the learning rate during training
+# initAlpha: initial learning rate 
+# finalAlpha: final learning rate
+# gamma: NewAlpha = initAlpha * (gamma ** exp), exp determined by the desired number of epochs
+# epochs: desired number of epochs for training
+class StepDecay:
+    def __init__(self, initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = 100):
+        # store the base initial learning rate, drop factor, and
+        # epochs to drop every
+        self.initAlpha = initAlpha
+        self.finalAlpha = finalAlpha
+        self.gamma = gamma
+        self.epochs = epochs
+        self.beta = (np.log(self.finalAlpha) - np.log(self.initAlpha)) / np.log(self.gamma)
+        self.dropEvery = self.epochs / self.beta
+
+    def __call__(self, epoch):
+        # compute the learning rate for the current epoch
+        exp = epoch%self.dropEvery # epoch starts from 0, callbacks called from the beginning
+        alpha = self.initAlpha * (self.gamma ** exp)
+
+        # return the learning rate
+        return float(alpha)
+##

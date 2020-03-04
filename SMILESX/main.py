@@ -33,10 +33,13 @@ np.set_printoptions(precision=3)
 # If gpus_list and ngpus are both provided, gpus_list prevails
 def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
     
+    # To find out which devices your operations and tensors are assigned to
+    tf.debugging.set_log_device_placement(gpus_debug)
+    
     if gpus_list is not None:
-        gpu_ids = ','.join(gpus_list)
+        gpu_ids = gpus_list
     else:
-        gpu_ids = ','.join([str(iid) for iid in range(ngpus)])
+        gpu_ids = [str(iid) for iid in range(ngpus)]
     # For fixing the GPU in use
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
     # The GPU id to use (e.g. "0", "1", etc.)
@@ -54,18 +57,15 @@ def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
             # Memory growth must be set before GPUs have been initialized
             print(e)
     
-    gpus_list_len = len(gpus)
+    gpus_list_len = len(logical_gpus)
     if gpus_list_len > 0:
         if gpus_list_len > 1: 
             strategy = tf.distribute.MirroredStrategy()
         else: 
-            strategy = tf.distribute.OneDeviceStrategy()
-        print ('{} GPU devices will be used.'.format(strategy.num_replicas_in_sync))
+            strategy = tf.distribute.OneDeviceStrategy(device="/gpu:"+gpu_ids[0])
+        print ('{} GPU device(s) will be used.\n'.format(strategy.num_replicas_in_sync))
         
-        # To find out which devices your operations and tensors are assigned to
-        tf.debugging.set_log_device_placement(gpus_debug)
-        
-        return strategy
+        return strategy, logical_gpus
     else:
         print("No GPU is detected in the system. SMILES-X needs at least one GPU to proceed.")
         return None
@@ -75,22 +75,16 @@ def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
 class DataSequence(Sequence):
     # Initialization
     # smiles_set: array of tokenized SMILES of dimensions (number_of_SMILES, max_length)
-    # vocab: vocabulary of tokens
-    # max_length: maximum length for SMILES in the dataset
     # props_set: array of targeted property
     # batch_size: batch's size
-    # soft_padding: pad tokenized SMILES at the same length in the whole dataset (False), or in the batch only (True) (Default: False)
     # returns: 
     #         a batch of arrays of tokenized and encoded SMILES, 
     #         a batch of SMILES property
-    def __init__(self, smiles_set, vocab, max_length, props_set, batch_size, soft_padding = False):
+    def __init__(self, smiles_set, props_set, batch_size):
         self.smiles_set = smiles_set
-        self.vocab = vocab
-        self.max_length = max_length
         self.props_set = props_set
         self.batch_size = batch_size
         self.iepoch = 0
-        self.soft_padding = soft_padding
 
     def on_epoch_end(self):
         self.iepoch += 1
@@ -99,20 +93,10 @@ class DataSequence(Sequence):
         return int(np.ceil(len(self.smiles_set) / float(self.batch_size)))
 
     def __getitem__(self, idx):
-        tokenized_smiles_list_tmp = self.smiles_set[idx * self.batch_size:(idx + 1) * self.batch_size]
-        # self.max_length + 1 padding
-        if self.soft_padding:
-            max_length_tmp = np.max([len(ismiles) for ismiles in tokenized_smiles_list_tmp])
-        else:
-            max_length_tmp = self.max_length
-        batch_x = token.int_vec_encode(tokenized_smiles_list = tokenized_smiles_list_tmp, 
-                                 max_length = max_length_tmp+1,
-                                 vocab = self.vocab)
-        #batch_x = self.batch[idx * self.batch_size:(idx + 1) * self.batch_size]
-
+        batch_x = self.smiles_set[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_y = self.props_set[idx * self.batch_size:(idx + 1) * self.batch_size]
 
-        return np.array(batch_x), np.array(batch_y)
+        return batch_x, batch_y
 ##
 
 
@@ -124,15 +108,12 @@ class DataSequence(Sequence):
 # k_fold_number: number of k-folds used for cross-validation (Default: 8)
 # augmentation: SMILES augmentation (Default: False)
 # outdir: directory for outputs (plots + .txt files) -> 'Main/'+'{}/{}/'.format(data_name,p_dir_temp) is then created
-# bayopt_n_epochs: number of epochs for training a neural architecture during Bayesian architecture search (Default: 10)
 # bayopt_n_rounds: number of architectures to be sampled during Bayesian architecture search (initialization + optimization) (Default: 25)
-# bayopt_it_factor: portion of data to be used during Bayesian architecture search (Default: 1)
 # bayopt_on: Use Bayesian architecture search or not (Default: True)
 # lstmunits_ref: number of LSTM units for the k_fold_index if Bayesian architecture search is off
 # denseunits_ref: number of dense units for the k_fold_index if Bayesian architecture search is off
 # embedding_ref: number of embedding dimensions for the k_fold_index if Bayesian architecture search is off
-# batch_size_ref: batch size for neural architecture training if Bayesian architecture search is off
-# alpha_ref: 10^(-alpha_ref) Adam's learning rate for neural architecture training if Bayesian architecture search is off
+# seed_ref: neural architecture's initialization seed (Default: None)
 # n_gpus: number of GPUs to be used in parallel (Default: 1)
 # gpus_list: list of GPU IDs to be used (Default: None), e.g. ['0','1','2']
 # gpus_debug: print out the GPUs ongoing usage 
@@ -153,25 +134,23 @@ def Main(data,
          k_fold_number = 10, 
          augmentation = False, 
          outdir = "../data/", 
-         bayopt_n_epochs = 10,
          bayopt_n_rounds = 25, 
-         bayopt_it_factor = 1, 
          bayopt_on = True, 
          lstmunits_ref = 512, 
          denseunits_ref = 512, 
          embedding_ref = 512, 
-         batch_size_ref = 64, 
-         alpha_ref = 3, 
+         seed_ref = None, 
          n_gpus = 1, 
          gpus_list = None, 
-         gpus_debug = False, 
+         gpus_debug = False,
+         batchsize_pergpu = 64, 
          patience = 25, 
          n_epochs = 100):
     
     # GPUs options
-    strategy = set_gpuoptions(n_gpus = n_gpus, 
-                              gpus_list = gpus_list, 
-                              gpus_debug = gpus_debug)
+    strategy, gpus = set_gpuoptions(n_gpus = n_gpus, 
+                                    gpus_list = gpus_list, 
+                                    gpus_debug = gpus_debug)
     if strategy is None:
         return
     ##
@@ -294,31 +273,34 @@ def Main(data,
             def create_mod(params):
                 print('Model: {}'.format(params))
 
-                model_tag = data_name
-
                 K.clear_session()
-                with strategy.scope():
-                    model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
-                                                          vocabsize = vocab_size, 
-                                                          lstmunits=int(params[:,0][0]), 
-                                                          denseunits = int(params[:,1]), 
-                                                          embedding = int(params[:,2][0]), 
-                                                          seed = seed)
-
-                    batch_size = int(params[:,3][0]) * strategy.num_replicas_in_sync
-                    custom_adam = Adam(lr=math.pow(10,-float(params[:,4][0])))
-                    model_opt.compile(loss='mse', optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
+                if gpus:
+                    mse_train_tmp = []
+                    for iseed in seed_list:
+                        y_pred_train_tmp = None
+                        with tf.device(gpus[0].name):
+                            model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
+                                                                  vocabsize = vocab_size, 
+                                                                  lstmunits=int(params[:,0][0]), 
+                                                                  denseunits = int(params[:,1]), 
+                                                                  embedding = int(params[:,2][0]), 
+                                                                  seed = iseed)
+                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
+                        with tf.device('/CPU:0'):
+                            y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
+                            y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
+                            mse_train_tmp.append(np.mean(np.square(y_pred_VS_true_train_tmp)))
+                    mse_train_mean_tmp = np.mean(mse_train_tmp)
+                    mse_train_std_tmp = np.std(mse_train_tmp)
+                else:
+                    print("Physical GPU(s) list doesn't exist.")
                     
-                model_opt.predict()    
-                    
-                mae_valid = history.history['val_mean_absolute_error'][best_epoch]
-                mse_valid = history.history['val_mean_squared_error'][best_epoch]
-                if math.isnan(mse_valid): # discard diverging architectures (rare event)
-                    mae_valid = math.inf
-                    mse_valid = math.inf
-                print('Valid MAE: {0:0.4f}, RMSE: {1:0.4f}'.format(mae_valid, mse_valid))
+                if math.isnan(mse_train_mean_tmp): # discard diverging architectures (rare event)
+                    mse_train_mean_tmp = math.inf
+                    mse_train_std_tmp = math.inf
+                print('Train MSE mean: {0:0.4f}, MSE std: {1:0.4f}'.format(mse_train_mean_tmp, mse_train_std_tmp))
 
-                return mse_valid
+                return mse_train_mean_tmp + mse_train_std_tmp
 
             print("Random initialization:\n")
             Bayes_opt = GPyOpt.methods.BayesianOptimization(f=create_mod, 
@@ -331,28 +313,47 @@ def Main(data,
             print("Optimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
             best_arch = Bayes_opt.x_opt
+            
+            # Find best seed
+            K.clear_session()
+            if gpus:
+                mse_train_tmp = []
+                for iseed in seed_list:
+                    y_pred_train_tmp = None
+                    with tf.device(gpus[0].name):
+                        model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
+                                                              vocabsize = vocab_size, 
+                                                              lstmunits= int(best_arch[0]), 
+                                                              denseunits = int(best_arch[1]), 
+                                                              embedding = int(best_arch[2]), 
+                                                              seed = iseed)
+                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
+                    with tf.device('/CPU:0'):
+                        y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
+                        y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
+                        mse_train_tmp.append(np.mean(np.square(y_pred_VS_true_train_tmp)))
+                best_seed = seed_list[np.argmin(mse_train_tmp)]
+            else:
+                print("Physical GPU(s) list doesn't exist.")
+            
+            best_arch = best_arch + [best_seed]
         else:
-            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, batch_size_ref, alpha_ref]
+            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
             
         print("\nThe architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}".\
              format(int(best_arch[0]), int(best_arch[1]), int(best_arch[2])))
-        print("\tBatch size: {0:}\n\tLearning rate: 10^-({1:.1f})\n".format(int(best_arch[3]), float(best_arch[4])))
         
         print("***Training of the best model.***\n")
         # Train the model and predict
         K.clear_session()   
-        # Define the multi-gpus model if necessary
         with strategy.scope():
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                     vocabsize = vocab_size, 
                                                     lstmunits= int(best_arch[0]), 
                                                     denseunits = int(best_arch[1]), 
-                                                    embedding = int(best_arch[2]))
-            
-            batch_size = int(best_arch[3]) * strategy.num_replicas_in_sync
-            custom_adam = Adam(lr=math.pow(10,-float(best_arch[4])))
-            # Compile the model
-            model_train.compile(loss="mse", optimizer=custom_adam, metrics=[metrics.mae,metrics.mse])
+                                                    embedding = int(best_arch[2]), 
+                                                    seed = int(best_arch[3]))            
+            model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
             
         print("Best model summary:\n")
         print(model_train.summary())
@@ -372,23 +373,23 @@ def Main(data,
                                       patience=patience, 
                                       verbose=0, 
                                       mode='min')
+        
+        schedule = StepDecay(initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
                 
-        callbacks_list = [checkpoint, earlystopping]
+        callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule)]
+        
+        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
 
         # Fit the model
-        history = model_train.fit_generator(generator = DataSequence(x_train_enum_tokens,
-                                                                     vocab = tokens, 
-                                                                     max_length = max_length, 
-                                                                     props_set = y_train_enum, 
-                                                                     batch_size = batch_size), 
-                                            validation_data = DataSequence(x_valid_enum_tokens,
-                                                                           vocab = tokens, 
-                                                                           max_length = max_length, 
-                                                                           props_set = y_valid_enum, 
-                                                                           batch_size = min(len(x_valid_enum_tokens), batch_size)),
-                                            epochs = n_epochs, 
-                                            shuffle = True,
-                                            callbacks = callbacks_list)
+        history = model_train.fit(generator = DataSequence(x_train_enum_tokens,
+                                                           props_set = y_train_enum, 
+                                                           batch_size = batch_size), 
+                                  validation_data = DataSequence(x_valid_enum_tokens,
+                                                                 props_set = y_valid_enum, 
+                                                                 batch_size = min(len(x_valid_enum_tokens), batch_size)),
+                                  epochs = n_epochs, 
+                                  shuffle = True,
+                                  callbacks = callbacks_list)
 
         # Summarize history for losses per epoch
         plt.plot(history.history['loss'])
