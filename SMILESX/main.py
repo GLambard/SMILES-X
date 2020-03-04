@@ -11,7 +11,7 @@ import GPy, GPyOpt
 
 from tensorflow.keras.utils import Sequence
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from tensorflow.keras import metrics
 from tensorflow.keras import backend as K
 import tensorflow as tf
@@ -39,7 +39,7 @@ def set_gpuoptions(n_gpus = 1, gpus_list = None , gpus_debug = False):
     if gpus_list is not None:
         gpu_ids = gpus_list
     else:
-        gpu_ids = [str(iid) for iid in range(ngpus)]
+        gpu_ids = [str(iid) for iid in range(n_gpus)]
     # For fixing the GPU in use
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
     # The GPU id to use (e.g. "0", "1", etc.)
@@ -271,6 +271,7 @@ def Main(data,
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
             def create_mod(params):
+                params = params.astype(int).flatten().tolist()
                 print('Model: {}'.format(params))
 
                 K.clear_session()
@@ -281,9 +282,9 @@ def Main(data,
                         with tf.device(gpus[0].name):
                             model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                                   vocabsize = vocab_size, 
-                                                                  lstmunits=int(params[:,0][0]), 
-                                                                  denseunits = int(params[:,1]), 
-                                                                  embedding = int(params[:,2][0]), 
+                                                                  lstmunits = params[0], 
+                                                                  denseunits = params[1], 
+                                                                  embedding = params[2], 
                                                                   seed = iseed)
                             y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
                         with tf.device('/CPU:0'):
@@ -312,7 +313,7 @@ def Main(data,
                                                             num_cores = multiprocessing.cpu_count()-1)
             print("Optimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
-            best_arch = Bayes_opt.x_opt
+            best_arch = Bayes_opt.x_opt.astype(int).tolist()
             
             # Find best seed
             K.clear_session()
@@ -323,9 +324,9 @@ def Main(data,
                     with tf.device(gpus[0].name):
                         model_opt = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                               vocabsize = vocab_size, 
-                                                              lstmunits= int(best_arch[0]), 
-                                                              denseunits = int(best_arch[1]), 
-                                                              embedding = int(best_arch[2]), 
+                                                              lstmunits= best_arch[0], 
+                                                              denseunits = best_arch[1], 
+                                                              embedding = best_arch[2], 
                                                               seed = iseed)
                         y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
                     with tf.device('/CPU:0'):
@@ -341,7 +342,7 @@ def Main(data,
             best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
             
         print("\nThe architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}".\
-             format(int(best_arch[0]), int(best_arch[1]), int(best_arch[2])))
+             format(best_arch[0], best_arch[1], best_arch[2]))
         
         print("***Training of the best model.***\n")
         # Train the model and predict
@@ -349,10 +350,10 @@ def Main(data,
         with strategy.scope():
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
                                                     vocabsize = vocab_size, 
-                                                    lstmunits= int(best_arch[0]), 
-                                                    denseunits = int(best_arch[1]), 
-                                                    embedding = int(best_arch[2]), 
-                                                    seed = int(best_arch[3]))            
+                                                    lstmunits= best_arch[0], 
+                                                    denseunits = best_arch[1], 
+                                                    embedding = best_arch[2], 
+                                                    seed = best_arch[3])            
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
             
         print("Best model summary:\n")
@@ -374,19 +375,19 @@ def Main(data,
                                       verbose=0, 
                                       mode='min')
         
-        schedule = StepDecay(initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
+        schedule = utils.step_decay(initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
                 
         callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule)]
         
         batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
 
         # Fit the model
-        history = model_train.fit(generator = DataSequence(x_train_enum_tokens,
-                                                           props_set = y_train_enum, 
-                                                           batch_size = batch_size), 
-                                  validation_data = DataSequence(x_valid_enum_tokens,
+        history = model_train.fit(DataSequence(x_train_enum_tokens_tointvec,
+                                               props_set = y_train_enum, 
+                                               batch_size = batch_size), 
+                                  validation_data = DataSequence(x_valid_enum_tokens_tointvec,
                                                                  props_set = y_valid_enum, 
-                                                                 batch_size = min(len(x_valid_enum_tokens), batch_size)),
+                                                                 batch_size = min(len(x_valid_enum_tokens_tointvec), batch_size)),
                                   epochs = n_epochs, 
                                   shuffle = True,
                                   callbacks = callbacks_list)

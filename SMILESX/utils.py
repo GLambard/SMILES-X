@@ -99,7 +99,7 @@ def mean_median_result(x_cardinal_tmp, y_pred_tmp):
 # finalAlpha: final learning rate
 # gamma: NewAlpha = initAlpha * (gamma ** exp), exp determined by the desired number of epochs
 # epochs: desired number of epochs for training
-class StepDecay:
+class step_decay():
     def __init__(self, initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = 100):
         # store the base initial learning rate, drop factor, and
         # epochs to drop every
