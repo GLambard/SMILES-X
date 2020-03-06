@@ -58,16 +58,16 @@ def split_standardize(smiles_input, prop_input, train_index, valid_test_index):
                           copy=True)
     scaler_fit = scaler.fit(y_train)
     print("Scaler: {}".format(scaler_fit))
-    y_train = scaler.transform(y_train)
-    y_valid = scaler.transform(y_valid)
-    y_test = scaler.transform(y_test)
+    y_train_scaled = scaler.transform(y_train)
+    y_valid_scaled = scaler.transform(y_valid)
+    y_test_scaled = scaler.transform(y_test)
     
     print("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n\n".format(\
                                       x_train.shape[0]/smiles_input.shape[0],\
                                       x_valid.shape[0]/smiles_input.shape[0],\
                                       x_test.shape[0]/smiles_input.shape[0]))
     
-    return x_train, x_valid, x_test, y_train, y_valid, y_test, scaler
+    return x_train, x_valid, x_test, y_train_scaled, y_valid_scaled, y_test_scaled, scaler, y_train, y_valid, y_test
 ##
 
 ## Compute mean and median of predictions

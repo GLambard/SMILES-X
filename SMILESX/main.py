@@ -188,7 +188,7 @@ def Main(data,
         print("******")
         
         print("***Splitting and standardization of the dataset.***\n")
-        x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
+        x_train, x_valid, x_test, y_train, y_valid, y_test, scaler, y_train_unscaled, y_valid_unscaled, y_test_unscaled = \
         utils.split_standardize(smiles_input = data_smiles, 
                                 prop_input = data_prop, 
                                 train_index = train_index, 
@@ -308,8 +308,8 @@ def Main(data,
                                                             domain=bayopt_bounds, 
                                                             acquisition_type = 'EI',
                                                             initial_design_numdata = bayopt_n_rounds,
-                                                            exact_feval = False,
-                                                            normalize_Y = True,
+                                                            exact_feval = True,
+                                                            normalize_Y = False,
                                                             num_cores = multiprocessing.cpu_count()-1)
             print("Optimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
@@ -405,62 +405,61 @@ def Main(data,
         print("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
 
         print("***Predictions from the best model.***\n")
-        model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
-        model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
-
-        y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
-        y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)
-        y_pred_test = model_train.predict(x_test_enum_tokens_tointvec)
+        with tf.device(gpus[0].name):
+            K.clear_session()
+            model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
+                                                    vocabsize = vocab_size, 
+                                                    lstmunits= best_arch[0], 
+                                                    denseunits = best_arch[1], 
+                                                    embedding = best_arch[2], 
+                                                    seed = best_arch[3])
+            model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
+        
+            y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
+            y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)
+            y_pred_test = model_train.predict(x_test_enum_tokens_tointvec)
 
         # compute a mean per set of augmented SMILES
         y_pred_train_mean, _ = utils.mean_median_result(x_train_enum_card, y_pred_train)
         y_pred_valid_mean, _ = utils.mean_median_result(x_valid_enum_card, y_pred_valid)
         y_pred_test_mean, _ = utils.mean_median_result(x_test_enum_card, y_pred_test)
 
+        
+        # unscale prediction's outcomes
+        y_pred_train_mean = scaler.inverse_transform(y_pred_train_mean.reshape(-1,1))
+        y_pred_valid_mean = scaler.inverse_transform(y_pred_valid_mean.reshape(-1,1))
+        y_pred_test_mean = scaler.inverse_transform(y_pred_test_mean.reshape(-1,1))
+        
         # inverse transform the scaling of the property and plot 'predictions VS observations'
-        y_pred_VS_true_train = scaler.inverse_transform(y_train) - \
-                               scaler.inverse_transform(y_pred_train_mean.reshape(-1,1))
+        y_pred_VS_true_train = y_train_unscaled - y_pred_train_mean
         mae_train = np.mean(np.absolute(y_pred_VS_true_train))
         mse_train = np.mean(np.square(y_pred_VS_true_train))
-        corrcoef_train = r2_score(scaler.inverse_transform(y_train), \
-                                 scaler.inverse_transform(y_pred_train_mean.reshape(-1,1)))
+        corrcoef_train = r2_score(y_train_unscaled, y_pred_train_mean)
         print("For the training set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_train, np.sqrt(mse_train), corrcoef_train))
 
-        y_pred_VS_true_valid = scaler.inverse_transform(y_valid) - \
-                               scaler.inverse_transform(y_pred_valid_mean.reshape(-1,1))
+        y_pred_VS_true_valid = y_valid_unscaled - y_pred_valid_mean
         mae_valid = np.mean(np.absolute(y_pred_VS_true_valid))
         mse_valid = np.mean(np.square(y_pred_VS_true_valid))
-        corrcoef_valid = r2_score(scaler.inverse_transform(y_valid), \
-                                  scaler.inverse_transform(y_pred_valid_mean.reshape(-1,1)))
+        corrcoef_valid = r2_score(y_valid_unscaled, y_pred_valid_mean)
         print("For the validation set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_valid, np.sqrt(mse_valid), corrcoef_valid))
 
-        y_pred_VS_true_test = scaler.inverse_transform(y_test) - \
-                              scaler.inverse_transform(y_pred_test_mean.reshape(-1,1))
+        y_pred_VS_true_test = y_test_unscaled - y_pred_test_mean
         mae_test = np.mean(np.absolute(y_pred_VS_true_test))
         mse_test = np.mean(np.square(y_pred_VS_true_test))
-        corrcoef_test = r2_score(scaler.inverse_transform(y_test), \
-                                 scaler.inverse_transform(y_pred_test_mean.reshape(-1,1)))
+        corrcoef_test = r2_score(y_test_unscaled, y_pred_test_mean)
         print("For the test set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_test, np.sqrt(mse_test), corrcoef_test))
 
         # Plot the final result
-        # Unscaling the data
-        y_train = scaler.inverse_transform(y_train)
-        y_pred_train_mean = scaler.inverse_transform(y_pred_train_mean.reshape(-1,1))
-        y_valid = scaler.inverse_transform(y_valid)
-        y_pred_valid_mean = scaler.inverse_transform(y_pred_valid_mean.reshape(-1,1))
-        y_test = scaler.inverse_transform(y_test)
-        y_pred_test_mean = scaler.inverse_transform(y_pred_test_mean.reshape(-1,1))
-
         # Changed colors, scaling and sizes
         plt.figure(figsize=(12, 8))
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Setting plot limits
-        y_true_min = min(np.min(y_train), np.min(y_valid), np.min(y_test))
-        y_true_max = max(np.max(y_train), np.max(y_valid), np.max(y_test))
+        y_true_min = min(np.min(y_train_unscaled), np.min(y_valid_unscaled), np.min(y_test_unscaled))
+        y_true_max = max(np.max(y_train_unscaled), np.max(y_valid_unscaled), np.max(y_test_unscaled))
         y_pred_min = min(np.min(y_pred_train_mean), np.min(y_pred_valid_mean), np.min(y_pred_test_mean))
         y_pred_max = max(np.max(y_pred_train_mean), np.max(y_pred_valid_mean), np.max(y_pred_test_mean))
         # Expanding slightly the canvas around the data points (by 10%)
@@ -472,7 +471,7 @@ def Main(data,
         plt.xlim(min(axmin, aymin), max(axmax, aymax))
         plt.ylim(min(axmin, aymin), max(axmax, aymax))
                         
-        plt.errorbar(y_train, 
+        plt.errorbar(y_train_unscaled, 
                     y_pred_train_mean,
                     fmt='o',
                     label="Train",
@@ -481,7 +480,7 @@ def Main(data,
                     mfc='#519fc4',
                     markeredgewidth = 0,
                     alpha=0.7)
-        plt.errorbar(y_valid,
+        plt.errorbar(y_valid_unscaled,
                     y_pred_valid_mean,
                     elinewidth = 0,
                     fmt='o',
@@ -490,7 +489,7 @@ def Main(data,
                     mfc='#db702e',
                     markeredgewidth = 0,
                     alpha=0.7)
-        plt.errorbar(y_test,
+        plt.errorbar(y_test_unscaled,
                     y_pred_test_mean,
                     elinewidth = 0,
                     fmt='o',
