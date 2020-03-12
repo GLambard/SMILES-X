@@ -13,6 +13,8 @@ rkrb.DisableLog('rdApp.error')
 from sklearn.preprocessing import RobustScaler
 from scipy.ndimage.interpolation import shift
 
+from tensorflow.keras.callbacks import Callback
+
 np.set_printoptions(precision=3)
 
 ## SMILES RDKit checker 
@@ -44,7 +46,7 @@ def check_smiles(dataframe):
 #         3 arrays of smiles for training, validation, test: x_train, x_valid, x_test, 
 #         3 arrays of properties for training, validation, test: y_train, y_valid, y_test, 
 #         the scaling function: scaler
-def split_standardize(smiles_input, prop_input, train_index, valid_test_index):
+def split_standardize(smiles_input, prop_input, train_index, valid_test_index, logger):
     
     x_train, x_valid_test = smiles_input[train_index], smiles_input[valid_test_index]
     y_train, y_valid_test = prop_input[train_index], prop_input[valid_test_index]
@@ -57,15 +59,15 @@ def split_standardize(smiles_input, prop_input, train_index, valid_test_index):
                           quantile_range=(5.0, 95.0), 
                           copy=True)
     scaler_fit = scaler.fit(y_train)
-    print("Scaler: {}".format(scaler_fit))
+    logger.info("Scaler: {}".format(scaler_fit))
     y_train_scaled = scaler.transform(y_train)
     y_valid_scaled = scaler.transform(y_valid)
     y_test_scaled = scaler.transform(y_test)
     
-    print("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n\n".format(\
-                                      x_train.shape[0]/smiles_input.shape[0],\
-                                      x_valid.shape[0]/smiles_input.shape[0],\
-                                      x_test.shape[0]/smiles_input.shape[0]))
+    logger.info("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n\n".format(\
+                                          x_train.shape[0]/smiles_input.shape[0],\
+                                          x_valid.shape[0]/smiles_input.shape[0],\
+                                          x_test.shape[0]/smiles_input.shape[0]))
     
     return x_train, x_valid, x_test, y_train_scaled, y_valid_scaled, y_test_scaled, scaler, y_train, y_valid, y_test
 ##
@@ -117,4 +119,18 @@ class step_decay():
 
         # return the learning rate
         return float(alpha)
+##
+
+## Logging callback in a pre-defined logging file
+# Usage: model.fit(...,callbacks=[LoggingCallback(logging.info)])
+class LoggingCallback(Callback):
+    """Callback that logs message at end of epoch.
+    """
+    def __init__(self, print_fcn=print):
+        Callback.__init__(self)
+        self.print_fcn = print_fcn
+
+    def on_epoch_end(self, epoch, logs={}):
+        msg = "{Epoch: %i} %s" % (epoch, ", ".join("%s: %f" % (k, v) for k, v in logs.items()))
+        self.print_fcn(msg)
 ##

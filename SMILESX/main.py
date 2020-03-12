@@ -1,6 +1,9 @@
 import numpy as np
 import os
 import math
+import glob
+
+import tqdm
 
 import matplotlib.pyplot as plt
 
@@ -14,13 +17,20 @@ from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from tensorflow.keras import metrics
 from tensorflow.keras import backend as K
+
 import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # or any {DEBUG, INFO, WARN, ERROR, FATAL}
+
 import multiprocessing
 
 from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score
 
 from SMILESX import utils, token, augm, model, clr_callback
+
+import logging
+import datetime
+import time
 
 np.random.seed(seed=123)
 np.set_printoptions(precision=3)
@@ -119,6 +129,8 @@ class DataSequence(Sequence):
 # gpus_debug: print out the GPUs ongoing usage 
 # patience: number of epochs to respect before stopping a training after minimal validation's error (Default: 25)
 # n_epochs: maximum of epochs for training (Default: 1000)
+# lr_schedule: learning rate schedule (Default: None), e.g. None, 'decay' (step decay) or 'clr' (cyclical)
+# verbose: model fit verbosity (Default: 0), e.g. 0, 1 or 2
 # returns:
 #         Tokens list (Vocabulary) -> *.txt
 #         Best architecture -> *.hdf5
@@ -146,7 +158,8 @@ def Main(data,
          batchsize_pergpu = 64, 
          patience = 25, 
          n_epochs = 100, 
-         lr_schedule = None):
+         lr_schedule = None, 
+         verbose = 0):
     
     # GPUs options
     strategy, gpus = set_gpuoptions(n_gpus = n_gpus, 
@@ -159,22 +172,68 @@ def Main(data,
     # Data augmentation
     if augmentation:
         p_dir_temp = 'Augm'
-        print("***Data augmentation to {}***\n".format(augmentation))
         canonical = False
         rotation = True
     else:
         p_dir_temp = 'Can'
-        print("***No data augmentation has been required.***\n")
         canonical = True
         rotation = False
     ##
       
     # Output directory
     save_dir = outdir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
-    os.makedirs(save_dir, exist_ok=True)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    else:
+        for itype in ["png", "hdf5"]: # vocabulary *.txt and log files are kept
+            exists_files = glob.glob(save_dir + "*." + itype)
+            for ifile in exists_files:
+                os.remove(ifile)
     ##
-        
-    print("***SMILES_X starts...***\n\n")
+    
+    # Logging
+    currentDT = datetime.datetime.now()
+    strDT = currentDT.strftime("%Y-%m-%d_%H:%M:%S")
+    logging.basicConfig(filename=save_dir+strDT+'_Main.log', filemode='w', 
+                        level=logging.INFO, format='%(message)s')
+    ##
+    
+    logging.info("***Configuration parameters:***")
+    logging.info("data = {}".format(data)) 
+    logging.info("data_name = \'{}\'".format(data_name)) 
+    logging.info("bayopt_bounds = {}".format(bayopt_bounds)) 
+    logging.info("data_units = \'{}\'".format(data_units))
+    logging.info("k_fold_number = {}".format(k_fold_number)) 
+    logging.info("augmentation = {}".format(augmentation)) 
+    logging.info("outdir = \'{}\'".format(outdir)) 
+    logging.info("bayopt_n_rounds = {}".format(bayopt_n_rounds)) 
+    logging.info("bayopt_on = {}".format(bayopt_on)) 
+    logging.info("lstmunits_ref = {}".format(lstmunits_ref)) 
+    logging.info("denseunits_ref = {}".format(denseunits_ref)) 
+    logging.info("embedding_ref = {}".format(embedding_ref)) 
+    logging.info("seed_ref = {}".format(seed_ref))
+    logging.info("n_gpus = {}".format(n_gpus)) 
+    logging.info("gpus_list = {}".format(gpus_list)) 
+    logging.info("gpus_debug = {}".format(gpus_debug))
+    logging.info("batchsize_pergpu = {}".format(batchsize_pergpu)) 
+    logging.info("patience = {}".format(patience)) 
+    logging.info("n_epochs = {}".format(n_epochs))
+    logging.info("lr_schedule = {}".format(lr_schedule)) 
+    logging.info("verbose = {}".format(verbose))
+    logging.info("******\n")
+    
+    logging.info("{} Logical GPUs detected and configured.\n".format(len(gpus)))
+    
+    if augmentation:
+        logging.info("***Data augmentation to {}***\n\n".format(augmentation))
+    else:
+        logging.info("***No data augmentation has been required.***\n\n")
+    
+    logging.info("************************")
+    logging.info("***SMILES_X starts...***")
+    logging.info("************************\n\n")
+    print("***SMILES_X starts...***\n")
+    print("The SMILES_X process can be followed in the "+save_dir+strDT+'_Main.log'+" file.\n")
     # Setting up the seeds for models initialization
     seed_list = np.random.randint(int(1e6), size = 10).tolist()
     # Setting up the cross_validation on k-folds
@@ -184,16 +243,27 @@ def Main(data,
     kf.get_n_splits(data_smiles)
     for ifold, (train_index, valid_test_index) in enumerate(kf.split(data_smiles)):
         
-        print("******")
-        print("***Fold #{} initiated...***".format(ifold))
-        print("******")
+        if ifold == 0:
+            start_time = time.time()
+            print("Processing the 1st fold of data...", end = '\r')
+        elif ifold > 0 and ifold < (k_fold_number-1):
+            if ifold == 1:
+                onefold_time = (time.time() - start_time)
+            print("Remaining time: {:.2f} h. Processing fold #{} of data...".format((k_fold_number-ifold)*onefold_time/3600., ifold), end = '\r')
+        else:
+            print("Remaining time: <{:.2f} h. Processing the last fold of data...\n".format(onefold_time/3600.))
         
-        print("***Splitting and standardization of the dataset.***\n")
+        logging.info("******")
+        logging.info("***Fold #{} initiated...***".format(ifold))
+        logging.info("******")
+        
+        logging.info("***Splitting and standardization of the dataset.***\n")
         x_train, x_valid, x_test, y_train, y_valid, y_test, scaler, y_train_unscaled, y_valid_unscaled, y_test_unscaled = \
         utils.split_standardize(smiles_input = data_smiles, 
                                 prop_input = data_prop, 
                                 train_index = train_index, 
-                                valid_test_index = valid_test_index)
+                                valid_test_index = valid_test_index, 
+                                logger = logging.getLogger(__name__))
             
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
@@ -204,16 +274,16 @@ def Main(data,
         x_test_enum, x_test_enum_card, y_test_enum = \
         augm.Augmentation(x_test, y_test, canon=canonical, rotate=rotation)
         
-        print("Enumerated SMILES:\n\tTraining set: {}\n\tValidation set: {}\n\tTest set: {}\n".\
+        logging.info("Enumerated SMILES:\n\tTraining set: {}\n\tValidation set: {}\n\tTest set: {}\n".\
         format(x_train_enum.shape[0], x_valid_enum.shape[0], x_test_enum.shape[0]))
         
-        print("***Tokenization of SMILES.***\n")
+        logging.info("***Tokenization of SMILES.***\n")
         # Tokenize SMILES per dataset
         x_train_enum_tokens = token.get_tokens(x_train_enum)
         x_valid_enum_tokens = token.get_tokens(x_valid_enum)
         x_test_enum_tokens = token.get_tokens(x_test_enum)
         
-        print("Examples of tokenized SMILES from a training set:\n{}\n".\
+        logging.info("Examples of tokenized SMILES from a training set:\n{}\n".\
         format(x_train_enum_tokens[:5]))
         
         # Vocabulary size computation
@@ -230,32 +300,32 @@ def Main(data,
         vocab_size = len(tokens)
         
         train_unique_tokens = token.extract_vocab(x_train_enum_tokens)
-        print("Number of tokens only present in a training set: {}\n".format(len(train_unique_tokens)))
+        logging.info("Number of tokens only present in a training set: {}\n".format(len(train_unique_tokens)))
         valid_unique_tokens = token.extract_vocab(x_valid_enum_tokens)
-        print("Number of tokens only present in a validation set: {}".format(len(valid_unique_tokens)))
-        print("Is the validation set a subset of the training set: {}".\
+        logging.info("Number of tokens only present in a validation set: {}".format(len(valid_unique_tokens)))
+        logging.info("Is the validation set a subset of the training set: {}".\
               format(valid_unique_tokens.issubset(train_unique_tokens)))
-        print("What are the tokens by which they differ: {}\n".\
+        logging.info("What are the tokens by which they differ: {}\n".\
               format(valid_unique_tokens.difference(train_unique_tokens)))
         test_unique_tokens = token.extract_vocab(x_test_enum_tokens)
-        print("Number of tokens only present in a test set: {}".format(len(test_unique_tokens)))
-        print("Is the test set a subset of the training set: {}".\
+        logging.info("Number of tokens only present in a test set: {}".format(len(test_unique_tokens)))
+        logging.info("Is the test set a subset of the training set: {}".\
               format(test_unique_tokens.issubset(train_unique_tokens)))
-        print("What are the tokens by which they differ: {}".\
+        logging.info("What are the tokens by which they differ: {}".\
               format(test_unique_tokens.difference(train_unique_tokens)))
-        print("Is the test set a subset of the validation set: {}".\
+        logging.info("Is the test set a subset of the validation set: {}".\
               format(test_unique_tokens.issubset(valid_unique_tokens)))
-        print("What are the tokens by which they differ: {}\n".\
+        logging.info("What are the tokens by which they differ: {}\n".\
               format(test_unique_tokens.difference(valid_unique_tokens)))
         
-        print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
+        logging.info("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
         
         # Add 'pad', 'unk' tokens to the existing list
         tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
         
         # Maximum of length of SMILES to process
         max_length = np.max([len(ismiles) for ismiles in all_smiles_tokens])
-        print("Maximum length of tokenized SMILES: {} tokens (termination spaces included)\n".format(max_length))
+        logging.info("Maximum length of tokenized SMILES: {} tokens (termination spaces included)\n".format(max_length))
         
         # predict and compare for the training, validation and test sets
         x_train_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_enum_tokens, 
@@ -268,12 +338,12 @@ def Main(data,
                                                            max_length = max_length+1, 
                                                            vocab = tokens)
         
-        print("***Bayesian Optimization of the SMILESX's architecture.***\n")        
+        logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n")        
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
             def create_mod(params):
                 params = params.astype(int).flatten().tolist()
-                print('Model: {}'.format(params))
+                logging.info('Model: {}'.format(params))
 
                 K.clear_session()
                 if gpus:
@@ -295,16 +365,16 @@ def Main(data,
                     mse_train_mean_tmp = np.mean(mse_train_tmp)
                     mse_train_std_tmp = np.std(mse_train_tmp)
                 else:
-                    print("Physical GPU(s) list doesn't exist.")
+                    logging.warning("Physical GPU(s) list doesn't exist.")
                     
                 if math.isnan(mse_train_mean_tmp): # discard diverging architectures (rare event)
                     mse_train_mean_tmp = math.inf
                     mse_train_std_tmp = math.inf
-                print('Train MSE mean: {0:0.4f}, MSE std: {1:0.4f}'.format(mse_train_mean_tmp, mse_train_std_tmp))
+                logging.info('Train MSE mean: {0:0.4f}, MSE std: {1:0.4f}'.format(mse_train_mean_tmp, mse_train_std_tmp))
 
                 return mse_train_mean_tmp + mse_train_std_tmp
 
-            print("Random initialization:\n")
+            logging.info("Random initialization:\n")
             Bayes_opt = GPyOpt.methods.BayesianOptimization(f=create_mod, 
                                                             domain=bayopt_bounds, 
                                                             acquisition_type = 'EI',
@@ -312,7 +382,7 @@ def Main(data,
                                                             exact_feval = True,
                                                             normalize_Y = False,
                                                             num_cores = multiprocessing.cpu_count()-1)
-            print("\nOptimization:\n")
+            logging.info("\nOptimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
             best_arch = Bayes_opt.x_opt.astype(int).tolist()
             
@@ -336,16 +406,16 @@ def Main(data,
                         mse_train_tmp.append(np.mean(np.square(y_pred_VS_true_train_tmp)))
                 best_seed = seed_list[np.argmin(mse_train_tmp)]
             else:
-                print("Physical GPU(s) list doesn't exist.")
+                logging.warning("Physical GPU(s) list doesn't exist.")
             
             best_arch = best_arch + [best_seed]
         else:
             best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
             
-        print("\nThe architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}".\
+        logging.info("\nThe architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}".\
              format(best_arch[0], best_arch[1], best_arch[2]))
         
-        print("***Training of the best model.***\n")
+        logging.info("***Training of the best model.***\n")
         # Train the model and predict
         K.clear_session()   
         with strategy.scope():
@@ -357,9 +427,9 @@ def Main(data,
                                                     seed = best_arch[3])            
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
             
-        print("Best model summary:\n")
-        print(model_train.summary())
-        print("\n")
+        logging.info("Best model summary:\n")
+        model_train.summary(print_fn=logging.info)
+        logging.info("\n")
         
         # Checkpoint, Early stopping and callbacks definition
         filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5'
@@ -385,11 +455,14 @@ def Main(data,
                                     mode='triangular')
         
         if lr_schedule is None:
-            callbacks_list = [checkpoint, earlystopping] # default learning rate for Adam optimizer 
+            callbacks_list = [checkpoint, earlystopping, 
+                              utils.LoggingCallback(logging.info)] # default learning rate for Adam optimizer 
         elif lr_schedule == 'decay':
-            callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule)] # learning rate step decay 
+            callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule), 
+                              utils.LoggingCallback(logging.info)] # learning rate step decay 
         elif lr_schedule == 'clr':
-            callbacks_list = [checkpoint, earlystopping, clr] # cyclical learning rate
+            callbacks_list = [checkpoint, earlystopping, clr, 
+                              utils.LoggingCallback(logging.info)] # cyclical learning rate
 
         # Fit the model
         history = model_train.fit(DataSequence(x_train_enum_tokens_tointvec,
@@ -400,7 +473,8 @@ def Main(data,
                                                                  batch_size = min(len(x_valid_enum_tokens_tointvec), batch_size)),
                                   epochs = n_epochs, 
                                   shuffle = True,
-                                  callbacks = callbacks_list)
+                                  callbacks = callbacks_list, 
+                                  verbose = verbose)
 
         # Summarize history for losses per epoch
         plt.plot(history.history['loss'])
@@ -412,9 +486,9 @@ def Main(data,
         plt.savefig(save_dir+'History_fit_LSTMAtt_'+data_name+'_model_weights.best_fold_'+str(ifold)+'.png', bbox_inches='tight')
         plt.close()
         
-        print("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
+        logging.info("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
 
-        print("***Predictions from the best model.***\n")
+        logging.info("***Predictions from the best model.***\n")
         with tf.device(gpus[0].name):
             K.clear_session()
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 
@@ -445,21 +519,21 @@ def Main(data,
         mae_train = np.mean(np.absolute(y_pred_VS_true_train))
         mse_train = np.mean(np.square(y_pred_VS_true_train))
         corrcoef_train = r2_score(y_train_unscaled, y_pred_train_mean)
-        print("For the training set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
+        logging.info("For the training set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_train, np.sqrt(mse_train), corrcoef_train))
 
         y_pred_VS_true_valid = y_valid_unscaled - y_pred_valid_mean
         mae_valid = np.mean(np.absolute(y_pred_VS_true_valid))
         mse_valid = np.mean(np.square(y_pred_VS_true_valid))
         corrcoef_valid = r2_score(y_valid_unscaled, y_pred_valid_mean)
-        print("For the validation set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
+        logging.info("For the validation set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_valid, np.sqrt(mse_valid), corrcoef_valid))
 
         y_pred_VS_true_test = y_test_unscaled - y_pred_test_mean
         mae_test = np.mean(np.absolute(y_pred_VS_true_test))
         mse_test = np.mean(np.square(y_pred_VS_true_test))
         corrcoef_test = r2_score(y_test_unscaled, y_pred_test_mean)
-        print("For the test set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
+        logging.info("For the test set:\nMAE: {0:0.4f} RMSE: {1:0.4f} R^2: {2:0.4f}\n".\
               format(mae_test, np.sqrt(mse_test), corrcoef_test))
 
         # Plot the final result
@@ -524,3 +598,9 @@ def Main(data,
         # Added fold number
         plt.savefig(save_dir+'TrainValid_Plot_LSTMAtt_'+data_name+'_model_weights.best_fold_'+str(ifold)+'.png', bbox_inches='tight', dpi=80)
         plt.close()
+        
+        if ifold == (k_fold_number-1):
+            logging.info("*******************************************")
+            logging.info("***SMILES_X has terminated successfully.***")
+            logging.info("*******************************************\n\n")
+            print("***SMILES_X has terminated successfully.***\n")
