@@ -10,7 +10,7 @@ seed(12345)
 import GPy, GPyOpt
 
 from tensorflow.keras.utils import Sequence
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from tensorflow.keras import metrics
 from tensorflow.keras import backend as K
@@ -20,7 +20,7 @@ import multiprocessing
 from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score
 
-from SMILESX import utils, token, augm, model
+from SMILESX import utils, token, augm, model, clr_callback
 
 np.random.seed(seed=123)
 np.set_printoptions(precision=3)
@@ -145,7 +145,8 @@ def Main(data,
          gpus_debug = False,
          batchsize_pergpu = 64, 
          patience = 25, 
-         n_epochs = 100):
+         n_epochs = 100, 
+         lr_schedule = None):
     
     # GPUs options
     strategy, gpus = set_gpuoptions(n_gpus = n_gpus, 
@@ -311,7 +312,7 @@ def Main(data,
                                                             exact_feval = True,
                                                             normalize_Y = False,
                                                             num_cores = multiprocessing.cpu_count()-1)
-            print("Optimization:\n")
+            print("\nOptimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
             best_arch = Bayes_opt.x_opt.astype(int).tolist()
             
@@ -363,6 +364,8 @@ def Main(data,
         # Checkpoint, Early stopping and callbacks definition
         filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5'
         
+        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        
         checkpoint = ModelCheckpoint(filepath, 
                                      monitor='val_loss', 
                                      verbose=0, 
@@ -376,10 +379,17 @@ def Main(data,
                                       mode='min')
         
         schedule = utils.step_decay(initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
-                
-        callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule)]
         
-        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        clr = clr_callback.CyclicLR(base_lr = 1e-5, max_lr = 1e-2, 
+                                    step_size = 8 * (x_train_enum_tokens_tointvec.shape[0] // batch_size), 
+                                    mode='triangular')
+        
+        if lr_schedule is None:
+            callbacks_list = [checkpoint, earlystopping] # default learning rate for Adam optimizer 
+        elif lr_schedule == 'decay':
+            callbacks_list = [checkpoint, earlystopping, LearningRateScheduler(schedule)] # learning rate step decay 
+        elif lr_schedule == 'clr':
+            callbacks_list = [checkpoint, earlystopping, clr] # cyclical learning rate
 
         # Fit the model
         history = model_train.fit(DataSequence(x_train_enum_tokens_tointvec,
