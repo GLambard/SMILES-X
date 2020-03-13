@@ -412,7 +412,7 @@ def Main(data,
         else:
             best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
             
-        logging.info("\nThe architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}".\
+        logging.info("\nThe best architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}\n".\
              format(best_arch[0], best_arch[1], best_arch[2]))
         
         logging.info("***Training of the best model.***\n")
@@ -427,7 +427,7 @@ def Main(data,
                                                     seed = best_arch[3])            
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
             
-        logging.info("Best model summary:\n")
+        logging.info("Best model summary:")
         model_train.summary(print_fn=logging.info)
         logging.info("\n")
         
@@ -465,6 +465,7 @@ def Main(data,
                               utils.LoggingCallback(logging.info)] # cyclical learning rate
 
         # Fit the model
+        logging.info("Training:")
         history = model_train.fit(DataSequence(x_train_enum_tokens_tointvec,
                                                props_set = y_train_enum, 
                                                batch_size = batch_size), 
@@ -486,9 +487,9 @@ def Main(data,
         plt.savefig(save_dir+'History_fit_LSTMAtt_'+data_name+'_model_weights.best_fold_'+str(ifold)+'.png', bbox_inches='tight')
         plt.close()
         
-        logging.info("Best val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
+        logging.info("\nBest val_loss @ Epoch #{}\n".format(np.argmin(history.history['val_loss'])+1))
 
-        logging.info("***Predictions from the best model.***\n")
+        logging.info("***Prediction scores from the best model.***\n")
         with tf.device(gpus[0].name):
             K.clear_session()
             model_train = model.LSTMAttModel.create(inputtokens = max_length+1, 

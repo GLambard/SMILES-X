@@ -64,7 +64,7 @@ def split_standardize(smiles_input, prop_input, train_index, valid_test_index, l
     y_valid_scaled = scaler.transform(y_valid)
     y_test_scaled = scaler.transform(y_test)
     
-    logger.info("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n\n".format(\
+    logger.info("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n".format(\
                                           x_train.shape[0]/smiles_input.shape[0],\
                                           x_valid.shape[0]/smiles_input.shape[0],\
                                           x_test.shape[0]/smiles_input.shape[0]))
