@@ -235,7 +235,7 @@ def Main(data,
     print("***SMILES_X starts...***\n")
     print("The SMILES_X process can be followed in the "+save_dir+strDT+'_Main.log'+" file.\n")
     # Setting up the seeds for models initialization
-    seed_list = np.random.randint(int(1e6), size = 10).tolist()
+    seed_list = np.random.randint(int(1e6), size = 1).tolist()
     # Setting up the cross_validation on k-folds
     kf = KFold(n_splits=k_fold_number, random_state=123, shuffle=True)
     data_smiles = data.smiles.values
@@ -338,7 +338,10 @@ def Main(data,
                                                            max_length = max_length+1, 
                                                            vocab = tokens)
         
-        logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n")        
+        logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n") 
+        
+        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
             def create_mod(params):
@@ -357,7 +360,7 @@ def Main(data,
                                                                   denseunits = params[1], 
                                                                   embedding = params[2], 
                                                                   seed = iseed)
-                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
+                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
                         with tf.device('/CPU:0'):
                             y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -372,7 +375,7 @@ def Main(data,
                     mse_train_std_tmp = math.inf
                 logging.info('Train MSE mean: {0:0.4f}, MSE std: {1:0.4f}'.format(mse_train_mean_tmp, mse_train_std_tmp))
 
-                return mse_train_mean_tmp + mse_train_std_tmp
+                return mse_train_mean_tmp
 
             logging.info("Random initialization:\n")
             Bayes_opt = GPyOpt.methods.BayesianOptimization(f=create_mod, 
@@ -381,7 +384,10 @@ def Main(data,
                                                             initial_design_numdata = bayopt_n_rounds,
                                                             exact_feval = True,
                                                             normalize_Y = False,
-                                                            num_cores = multiprocessing.cpu_count()-1)
+                                                            num_cores = multiprocessing.cpu_count()-1, 
+                                                            model_type='GP', 
+                                                            initial_design_type='latin', 
+                                                            batch_size = 1)
             logging.info("\nOptimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
             best_arch = Bayes_opt.x_opt.astype(int).tolist()
@@ -399,7 +405,7 @@ def Main(data,
                                                               denseunits = best_arch[1], 
                                                               embedding = best_arch[2], 
                                                               seed = iseed)
-                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec)
+                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
                     with tf.device('/CPU:0'):
                         y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                         y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -433,8 +439,6 @@ def Main(data,
         
         # Checkpoint, Early stopping and callbacks definition
         filepath=save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5'
-        
-        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
         
         checkpoint = ModelCheckpoint(filepath, 
                                      monitor='val_loss', 
@@ -500,9 +504,9 @@ def Main(data,
                                                     seed = best_arch[3])
             model_train.load_weights(save_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
         
-            y_pred_train = model_train.predict(x_train_enum_tokens_tointvec)
-            y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec)
-            y_pred_test = model_train.predict(x_test_enum_tokens_tointvec)
+            y_pred_train = model_train.predict(x_train_enum_tokens_tointvec, batch_size)
+            y_pred_valid = model_train.predict(x_valid_enum_tokens_tointvec, batch_size)
+            y_pred_test = model_train.predict(x_test_enum_tokens_tointvec, batch_size)
 
         # compute a mean per set of augmented SMILES
         y_pred_train_mean, _ = utils.mean_median_result(x_train_enum_card, y_pred_train)
