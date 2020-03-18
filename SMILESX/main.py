@@ -267,7 +267,7 @@ def Main(data,
             
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
-
+        
         x_valid_enum, x_valid_enum_card, y_valid_enum = \
         augm.Augmentation(x_valid, y_valid, canon=canonical, rotate=rotation)
 
@@ -360,7 +360,7 @@ def Main(data,
                                                                   denseunits = params[1], 
                                                                   embedding = params[2], 
                                                                   seed = iseed)
-                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
+                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, params[3])
                         with tf.device('/CPU:0'):
                             y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -381,13 +381,11 @@ def Main(data,
             Bayes_opt = GPyOpt.methods.BayesianOptimization(f=create_mod, 
                                                             domain=bayopt_bounds, 
                                                             acquisition_type = 'EI',
+                                                            acquisition_jitter = 0.1, 
                                                             initial_design_numdata = bayopt_n_rounds,
                                                             exact_feval = True,
                                                             normalize_Y = False,
-                                                            num_cores = multiprocessing.cpu_count()-1, 
-                                                            model_type='GP', 
-                                                            initial_design_type='latin', 
-                                                            batch_size = 1)
+                                                            num_cores = 1) #multiprocessing.cpu_count()-1
             logging.info("\nOptimization:\n")
             Bayes_opt.run_optimization(max_iter=bayopt_n_rounds)
             best_arch = Bayes_opt.x_opt.astype(int).tolist()
@@ -405,7 +403,7 @@ def Main(data,
                                                               denseunits = best_arch[1], 
                                                               embedding = best_arch[2], 
                                                               seed = iseed)
-                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
+                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, best_arch[3])
                     with tf.device('/CPU:0'):
                         y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                         y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -415,8 +413,9 @@ def Main(data,
                 logging.warning("Physical GPU(s) list doesn't exist.")
             
             best_arch = best_arch + [best_seed]
+            batch_size = best_arch[3]
         else:
-            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
+            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, batch_size, seed_ref]
             
         logging.info("\nThe best architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}\n".\
              format(best_arch[0], best_arch[1], best_arch[2]))
@@ -430,9 +429,16 @@ def Main(data,
                                                     lstmunits= best_arch[0], 
                                                     denseunits = best_arch[1], 
                                                     embedding = best_arch[2], 
-                                                    seed = best_arch[3])            
+                                                    seed = best_arch[4])            
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
-            
+        
+#             y_pred_train_tmp = model_train.predict(x_train_enum_tokens_tointvec, best_arch[3])
+        
+#         with tf.device('/CPU:0'):
+#             y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
+#             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
+#             print(np.mean(np.square(y_pred_VS_true_train_tmp)))
+        
         logging.info("Best model summary:")
         model_train.summary(print_fn=logging.info)
         logging.info("\n")
@@ -452,9 +458,9 @@ def Main(data,
                                       verbose=0, 
                                       mode='min')
         
-        schedule = utils.step_decay(initAlpha = 1e-3, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
+        schedule = utils.step_decay(initAlpha = 1e-2, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
         
-        clr = clr_callback.CyclicLR(base_lr = 1e-5, max_lr = 1e-2, 
+        clr = clr_callback.CyclicLR(base_lr = 5e-4, max_lr = 5e-3, 
                                     step_size = 8 * (x_train_enum_tokens_tointvec.shape[0] // batch_size), 
                                     mode='triangular')
         
