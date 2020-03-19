@@ -267,7 +267,7 @@ def Main(data,
             
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
-        
+
         x_valid_enum, x_valid_enum_card, y_valid_enum = \
         augm.Augmentation(x_valid, y_valid, canon=canonical, rotate=rotation)
 
@@ -340,7 +340,10 @@ def Main(data,
         
         logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n") 
         
-        batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        #batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        batch_size_list = np.array([int(2**itn) for itn in range(3,11)])
+        batch_size = batch_size_list[np.argmax((batch_size_list // np.max(x_train_enum_card)) == 1.)]
+        batch_size *= strategy.num_replicas_in_sync
         
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
@@ -360,7 +363,7 @@ def Main(data,
                                                                   denseunits = params[1], 
                                                                   embedding = params[2], 
                                                                   seed = iseed)
-                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, params[3])
+                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
                         with tf.device('/CPU:0'):
                             y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -403,7 +406,7 @@ def Main(data,
                                                               denseunits = best_arch[1], 
                                                               embedding = best_arch[2], 
                                                               seed = iseed)
-                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, best_arch[3])
+                        y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size)
                     with tf.device('/CPU:0'):
                         y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
                         y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
@@ -413,9 +416,8 @@ def Main(data,
                 logging.warning("Physical GPU(s) list doesn't exist.")
             
             best_arch = best_arch + [best_seed]
-            batch_size = best_arch[3]
         else:
-            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, batch_size, seed_ref]
+            best_arch = [lstmunits_ref, denseunits_ref, embedding_ref, seed_ref]
             
         logging.info("\nThe best architecture for this datatset is:\n\tLSTM units: {}\n\tDense units: {}\n\tEmbedding dimensions {}\n".\
              format(best_arch[0], best_arch[1], best_arch[2]))
@@ -429,15 +431,8 @@ def Main(data,
                                                     lstmunits= best_arch[0], 
                                                     denseunits = best_arch[1], 
                                                     embedding = best_arch[2], 
-                                                    seed = best_arch[4])            
+                                                    seed = best_arch[3])            
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
-        
-#             y_pred_train_tmp = model_train.predict(x_train_enum_tokens_tointvec, best_arch[3])
-        
-#         with tf.device('/CPU:0'):
-#             y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
-#             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
-#             print(np.mean(np.square(y_pred_VS_true_train_tmp)))
         
         logging.info("Best model summary:")
         model_train.summary(print_fn=logging.info)
@@ -460,7 +455,7 @@ def Main(data,
         
         schedule = utils.step_decay(initAlpha = 1e-2, finalAlpha = 1e-5, gamma = 0.95, epochs = n_epochs)
         
-        clr = clr_callback.CyclicLR(base_lr = 5e-4, max_lr = 5e-3, 
+        clr = clr_callback.CyclicLR(base_lr = 1e-5, max_lr = 1e-2, 
                                     step_size = 8 * (x_train_enum_tokens_tointvec.shape[0] // batch_size), 
                                     mode='triangular')
         
