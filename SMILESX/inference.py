@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import glob
 
 from rdkit import Chem
 
@@ -13,16 +14,18 @@ from SMILESX import utils, model, token, augm
 # smiles_list: targeted SMILES list for property inference (Default: ['CC','CCC','C=O'])
 # data_name: dataset's name
 # data_units: property's SI units
-# k_fold_number: number of k-folds used for inference
+# k_fold_number: number of k-folds used for inference (Default: None, i.e. automatically detect k_fold_number from main.Main phase)
 # augmentation: SMILES's augmentation (Default: False)
-# outdir: directory for outputs (plots + .txt files) -> 'Inference/'+'{}/{}/'.format(data_name,p_dir_temp) is then created
+# indir: directory of already trained prediction models (*.hdf5) and vocabulary (*.txt) (Default: '../data/')
+# outdir: directory for outputs (plots + .txt files) -> 'Inference/'+'{}/{}/'.format(data_name,p_dir_temp) is then created (Default: '../data/')
 # returns:
 #         Array of SMILES with their inferred property (mean, standard deviation) from models ensembling
 def Inference(data_name, 
               smiles_list = ['CC','CCC','C=O'], 
               data_units = '',
-              k_fold_number = 8,
+              k_fold_number = None,
               augmentation = False, 
+              indir = "../data/", 
               outdir = "../data/"):
     
     if augmentation:
@@ -30,9 +33,24 @@ def Inference(data_name,
     else:
         p_dir_temp = 'Can'
         
-    input_dir = outdir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
+    input_dir = indir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
     save_dir = outdir+'Inference/'+'{}/{}/'.format(data_name,p_dir_temp)
     os.makedirs(save_dir, exist_ok=True)
+    
+    for itype in ["txt","hdf5"]:
+        exists_file = glob.glob(input_dir + "*." + itype)
+        exists_file_len = len(exists_file)
+        if exists_file_len > 0:
+            if itype == "hdf5":
+                if k_fold_number is None:
+                    k_fold_number = exists_file_len
+        else:
+            print("***Process of inference automatically aborted!***")
+            if itype == "hdf5":
+                print("The input directory does not contain any trained models (*.hdf5 files).")
+            else:
+                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).")
+            return
     
     print("***SMILES_X for inference starts...***\n\n")
     print("***Checking the SMILES list for inference***\n")
@@ -53,7 +71,7 @@ def Inference(data_name,
                 
     if len(smiles_checked) == 0:
         print("***Process of inference automatically aborted!***")
-        print("The provided SMILES are all incorrect and could not be verified via RDKit.")
+        print("The provided SMILES are all incorrect and could not be sanitized via RDKit.")
         return
     
     smiles_x = np.array(smiles_checked)
@@ -78,29 +96,29 @@ def Inference(data_name,
     # Tokenize SMILES 
     smiles_x_enum_tokens = token.get_tokens(smiles_x_enum)
 
+    # Setting up the vocabulary
+    # Tokens as a list
+    tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
+
+    # Add 'pad', 'unk' tokens to the existing list
+    vocab_size = len(tokens)
+    tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
+    print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
+
+    # Transformation of tokenized SMILES to vector of intergers and vice-versa
+    token_to_int = token.get_tokentoint(tokens)
+    int_to_token = token.get_inttotoken(tokens)
+    
     # models ensembling
     smiles_y_pred_mean_array = np.empty(shape=(0,len(smiles_checked)), dtype='float')
     for ifold in range(k_fold_number):
-        
-        # Tokens as a list
-        tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
-
-        # Add 'pad', 'unk' tokens to the existing list
-        vocab_size = len(tokens)
-        tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
-
-        # Transformation of tokenized SMILES to vector of intergers and vice-versa
-        token_to_int = token.get_tokentoint(tokens)
-        int_to_token = token.get_inttotoken(tokens)
-        
-        # Best architecture to visualize from
+        # Model's architecture
         model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
                                  custom_objects={'AttentionM': model.AttentionM()})
 
         if ifold == 0:
             # Maximum of length of SMILES to process
             max_length = model_train.layers[0].output_shape[-1]
-            print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
             print("Maximum length of tokenized SMILES: {} tokens\n".format(max_length))
 
         model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
