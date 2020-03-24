@@ -69,89 +69,55 @@ def get_inttotoken(tokens):
 ##
 
 ## Tokens finder
-# data: provided data (numpy array of: (SMILES, property))
-# data_name: dataset's name
-# data_units: property's SI units
-# k_fold_number: number of k-folds used for cross-validation
-# k_fold_index: k-fold index to be used for visualization
+# data: provided data (dataframe of: (smiles, property), or (smiles,))
 # augmentation: SMILES's augmentation (Default: False)
 # token_tofind: targeted token (elements, bonds, etc.) to find in the training set
 # verbose: print SMILES containing the targeted token (0: not print or 1: print, default: 1)
 # returns:
 #         How many SMILES contain the targeted token, and which SMILES if verbose = 1
 def TokensFinder(data, 
-                 data_name, 
-                 data_units = '',
-                 k_fold_number = 8,
-                 k_fold_index = 0,
                  augmentation = False, 
                  token_tofind = '', 
                  verbose = 1):
     
-    print("***SMILES_X token's finder starts...***\n\n")
-    np.random.seed(seed=123)
-    seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
+    print("***************************************")
+    print("***SMILES_X token's finder starts...***")
+    print("***************************************\n") 
     
-    print("******")
-    print("***Fold #{} initiated...***".format(k_fold_index))
-    print("******")
-
-    print("***Sampling and splitting of the dataset.***\n")
-    # Reproducing the data split of the requested fold (k_fold_index)
-    x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
-    utils.random_split(smiles_input=data.smiles, 
-                       prop_input=np.array(data.iloc[:,1]), 
-                       random_state=seed_list[k_fold_index], 
-                       scaling = True)
+    # SMILES from data 
+    data_smiles = data.smiles.values
+    fake_prop = np.ones((data_smiles.shape[0],1)) # for augm.Augmentation function
     
     # data augmentation or not
     if augmentation == True:
-        print("***Data augmentation.***\n")
+        print("Data augmentation required.")
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation has been required.***\n")
+        print("No data augmentation required.")
         canonical = True
         rotation = False
 
-    x_train_enum, x_train_enum_card, y_train_enum = \
-    augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
+    data_smiles_enum, _, _ = augm.Augmentation(data_smiles, fake_prop, canon=canonical, rotate=rotation)
 
-    x_valid_enum, x_valid_enum_card, y_valid_enum = \
-    augm.Augmentation(x_valid, y_valid, canon=canonical, rotate=rotation)
-
-    x_test_enum, x_test_enum_card, y_test_enum = \
-    augm.Augmentation(x_test, y_test, canon=canonical, rotate=rotation)
-
-    print("Enumerated SMILES:\n\tTraining set: {}\n\tValidation set: {}\n\tTest set: {}\n".\
-    format(x_train_enum.shape[0], x_valid_enum.shape[0], x_test_enum.shape[0]))
-
-    print("***Tokenization of SMILES.***\n")
+    print("Tokenization of provided SMILES.\n")
     # Tokenize SMILES per dataset
-    x_train_enum_tokens = get_tokens(x_train_enum)
-    x_valid_enum_tokens = get_tokens(x_valid_enum)
-    x_test_enum_tokens = get_tokens(x_test_enum)
-
-    print("Examples of tokenized SMILES from a training set:\n{}\n".\
-    format(x_train_enum_tokens[:5]))
-
-    # Vocabulary size computation
-    all_smiles_tokens = x_train_enum_tokens+x_valid_enum_tokens+x_test_enum_tokens
-    tokens = extract_vocab(all_smiles_tokens)
-    vocab_size = len(tokens)
-
-    train_unique_tokens = list(extract_vocab(x_train_enum_tokens))
+    data_smiles_enum_tokens = get_tokens(data_smiles_enum)
     
     # Token finder
-    print("The finder is processing the search...")
+    print(">>> The finder is processing the search... >>>")
     n_found = 0
-    for ismiles in x_train_enum_tokens:
+    for ismiles in data_smiles_enum_tokens:
         if token_tofind in ismiles:
             n_found += 1
             if verbose == 1: 
                 print(''.join(ismiles))
             
-    print("\n{} SMILES found with {} token in the training set.".format(n_found, token_tofind))
+    print("\n{} SMILES found with {} token in the training set.\n".format(n_found, token_tofind))
+    
+    print("**********************************************************")
+    print("***SMILES_X token's finder has terminated successfully.***")
+    print("**********************************************************\n") 
 ##
 
 ## Save the vocabulary for further use of a model

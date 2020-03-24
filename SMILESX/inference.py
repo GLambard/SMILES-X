@@ -118,7 +118,7 @@ def Inference(data_name,
 
         if ifold == 0:
             # Maximum of length of SMILES to process
-            max_length = model_train.layers[0].output_shape[-1]
+            max_length = model_train.layers[0].output_shape[-1][1]
             print("Maximum length of tokenized SMILES: {} tokens\n".format(max_length))
 
         model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
