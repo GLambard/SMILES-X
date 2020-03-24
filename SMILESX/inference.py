@@ -56,7 +56,7 @@ def Inference(data_name,
     print("***SMILES_X for inference starts...***")
     print("**************************************\n")
     
-    print("***Checking the SMILES list for inference***\n")
+    print("Checking the SMILES list for inference.\n")
     smiles_checked = list()
     smiles_rejected = list()
     for ismiles in smiles_list:
@@ -71,10 +71,11 @@ def Inference(data_name,
         with open(save_dir+'rejected_smiles.txt','w') as f:
             for ismiles in smiles_rejected:
                 f.write("%s\n" % ismiles)
+        print("Check the {} file for {} rejected SMILES.".format(save_dir+'rejected_smiles.txt', len(smiles_rejected)))
                 
     if len(smiles_checked) == 0:
         print("***Process of inference automatically aborted!***")
-        print("The provided SMILES are all incorrect and could not be sanitized via RDKit.")
+        print("The provided SMILES are all incorrect and could not be sanitized via RDKit.\n")
         return
     
     smiles_x = np.array(smiles_checked)
@@ -82,20 +83,20 @@ def Inference(data_name,
      
     # data augmentation or not
     if augmentation == True:
-        print("***Data augmentation.***\n")
+        print("Data augmentation required.")
         canonical = False
         rotation = True
     else:
-        print("***No data augmentation has been required.***\n")
+        print("No data augmentation is required.")
         canonical = True
         rotation = False
 
     smiles_x_enum, smiles_x_enum_card, smiles_y_enum = \
     augm.Augmentation(smiles_x, smiles_y, canon=canonical, rotate=rotation)
 
-    print("Enumerated SMILES: {}\n".format(smiles_x_enum.shape[0]))
+    print("Number of enumerated SMILES: {}.\n".format(smiles_x_enum.shape[0]))
     
-    print("***Tokenization of SMILES.***\n")
+    print("Tokenization of SMILES.")
     # Tokenize SMILES 
     smiles_x_enum_tokens = token.get_tokens(smiles_x_enum)
 
@@ -106,7 +107,7 @@ def Inference(data_name,
     # Add 'pad', 'unk' tokens to the existing list
     vocab_size = len(tokens)
     tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
-    print("Full vocabulary: {}\nOf size: {}\n".format(tokens, vocab_size))
+    print("Full vocabulary: {}, of size: {}.".format(tokens, vocab_size))
 
     # Transformation of tokenized SMILES to vector of intergers and vice-versa
     token_to_int = token.get_tokentoint(tokens)
@@ -122,7 +123,7 @@ def Inference(data_name,
         if ifold == 0:
             # Maximum of length of SMILES to process
             max_length = model_train.layers[0].output_shape[-1][1]
-            print("Maximum length of tokenized SMILES: {} tokens\n".format(max_length))
+            print("Maximum length of tokenized SMILES: {} tokens.\n".format(max_length))
 
         model_train.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
@@ -147,7 +148,9 @@ def Inference(data_name,
                                                smiles_y_pred_sd_ensemble]).T
             pred_from_ens.columns = ['SMILES', 'ens_pred_mean', 'ens_pred_sd']
             
+            print("****************************************")
             print("***Inference of SMILES property done.***")
+            print("****************************************\n")
             
             return pred_from_ens
 ##
