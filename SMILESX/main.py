@@ -32,6 +32,8 @@ import logging
 import datetime
 import time
 
+from pickle import dump
+
 np.random.seed(seed=123)
 np.set_printoptions(precision=3)
 
@@ -192,7 +194,7 @@ def Main(data,
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     else:
-        for itype in ["png", "hdf5"]: # vocabulary *.txt and log files are kept
+        for itype in ["png", "hdf5", "pkl"]: # vocabulary *.txt and log files are kept
             exists_files = glob.glob(save_dir + "*." + itype)
             for ifile in exists_files:
                 os.remove(ifile)
@@ -280,7 +282,10 @@ def Main(data,
                                 train_index = train_index, 
                                 valid_test_index = valid_test_index, 
                                 logger = logging.getLogger(__name__))
-            
+        
+        # Save scaler for future usage (e.g. inference)
+        dump(scaler, open('scaler_fold_' + str(ifold) + '.pkl', 'wb'))
+        
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
 

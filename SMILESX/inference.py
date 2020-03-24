@@ -10,6 +10,8 @@ from tensorflow.keras import metrics
 
 from SMILESX import utils, model, token, augm
 
+from pickle import load
+
 ## Inference on the SMILESX predictions
 # smiles_list: targeted SMILES list for property inference (Default: ['CC','CCC','C=O'])
 # data_name: dataset's name
@@ -37,7 +39,7 @@ def Inference(data_name,
     save_dir = outdir+'Inference/'+'{}/{}/'.format(data_name,p_dir_temp)
     os.makedirs(save_dir, exist_ok=True)
     
-    for itype in ["txt","hdf5"]:
+    for itype in ["txt","hdf5","pkl"]:
         exists_file = glob.glob(input_dir + "*." + itype)
         exists_file_len = len(exists_file)
         if exists_file_len > 0:
@@ -49,7 +51,7 @@ def Inference(data_name,
             if itype == "hdf5":
                 print("The input directory does not contain any trained models (*.hdf5 files).\n")
             else:
-                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).\n")
+                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file) or data scaler (*.pkl file).\n")
             return
     
     print("**************************************")
@@ -116,6 +118,9 @@ def Inference(data_name,
     # models ensembling
     smiles_y_pred_mean_array = np.empty(shape=(0,len(smiles_checked)), dtype='float')
     for ifold in range(k_fold_number):
+        # Load the scaler
+        scaler = load(open('scaler_fold_' + str(ifold) + '.pkl', 'rb'))
+        
         # Model's architecture
         model_train = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
                                  custom_objects={'AttentionM': model.AttentionM()})
@@ -136,6 +141,9 @@ def Inference(data_name,
 
         # compute a mean per set of augmented SMILES
         smiles_y_pred_mean, _ = utils.mean_median_result(smiles_x_enum_card, smiles_y_pred)
+        
+        # unscale prediction's outcomes
+        smiles_y_pred_mean = scaler.inverse_transform(smiles_y_pred_mean.reshape(-1,1))
         
         smiles_y_pred_mean_array = np.append(smiles_y_pred_mean_array, smiles_y_pred_mean.reshape(1,-1), axis = 0)
         
