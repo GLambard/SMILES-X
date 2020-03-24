@@ -46,7 +46,7 @@ def check_smiles(dataframe):
 #         3 arrays of smiles for training, validation, test: x_train, x_valid, x_test, 
 #         3 arrays of properties for training, validation, test: y_train, y_valid, y_test, 
 #         the scaling function: scaler
-def split_standardize(smiles_input, prop_input, train_index, valid_test_index, logger):
+def split_standardize(smiles_input, prop_input, train_index, valid_test_index, logger = None):
     
     x_train, x_valid_test = smiles_input[train_index], smiles_input[valid_test_index]
     y_train, y_valid_test = prop_input[train_index], prop_input[valid_test_index]
@@ -59,15 +59,17 @@ def split_standardize(smiles_input, prop_input, train_index, valid_test_index, l
                           quantile_range=(5.0, 95.0), 
                           copy=True)
     scaler_fit = scaler.fit(y_train)
-    logger.info("Scaler: {}".format(scaler_fit))
+    if logger is not None:
+        logger.info("Scaler: {}".format(scaler_fit))
     y_train_scaled = scaler.transform(y_train)
     y_valid_scaled = scaler.transform(y_valid)
     y_test_scaled = scaler.transform(y_test)
     
-    logger.info("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n".format(\
-                                          x_train.shape[0]/smiles_input.shape[0],\
-                                          x_valid.shape[0]/smiles_input.shape[0],\
-                                          x_test.shape[0]/smiles_input.shape[0]))
+    if logger is not None:
+        logger.info("Train/valid/test splits: {0:0.2f}/{1:0.2f}/{2:0.2f}\n".format(\
+                                              x_train.shape[0]/smiles_input.shape[0],\
+                                              x_valid.shape[0]/smiles_input.shape[0],\
+                                              x_test.shape[0]/smiles_input.shape[0]))
     
     return x_train, x_valid, x_test, y_train_scaled, y_valid_scaled, y_test_scaled, scaler, y_train, y_valid, y_test
 ##

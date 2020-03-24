@@ -47,12 +47,15 @@ def Inference(data_name,
         else:
             print("***Process of inference automatically aborted!***")
             if itype == "hdf5":
-                print("The input directory does not contain any trained models (*.hdf5 files).")
+                print("The input directory does not contain any trained models (*.hdf5 files).\n")
             else:
-                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).")
+                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).\n")
             return
     
-    print("***SMILES_X for inference starts...***\n\n")
+    print("**************************************")
+    print("***SMILES_X for inference starts...***")
+    print("**************************************\n")
+    
     print("***Checking the SMILES list for inference***\n")
     smiles_checked = list()
     smiles_rejected = list()

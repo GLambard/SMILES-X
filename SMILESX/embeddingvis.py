@@ -1,10 +1,12 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import glob
 
 from tensorflow.keras.models import load_model
 from tensorflow.keras import metrics
 
+from sklearn.model_selection import KFold
 from sklearn.decomposition import PCA
 from sklearn.cluster import AffinityPropagation
 from itertools import cycle
@@ -15,10 +17,10 @@ from SMILESX import model, utils, token, augm
 ## Visualization of the Embedding layer 
 # data: provided data (numpy array of: (SMILES, property))
 # data_name: dataset's name
-# data_units: property's SI units
-# k_fold_number: number of k-folds used for cross-validation
-# k_fold_index: k-fold index to be used for visualization
+# k_fold_number: number of k-folds used for inference (Default: None, i.e. automatically detect k_fold_number from main.Main phase)
+# k_fold_index: k-fold index to be used for visualization (Default: 0, i.e. first fold)
 # augmentation: SMILES's augmentation (Default: False)
+# indir: directory of already trained prediction models (*.hdf5) and vocabulary (*.txt) (Default: '../data/')
 # outdir: directory for outputs (plots + .txt files) -> 'Embedding_Vis/'+'{}/{}/'.format(data_name,p_dir_temp) is then created
 # affinity_propn: Affinity propagation tagging (Default: True)
 # returns:
@@ -26,10 +28,10 @@ from SMILESX import model, utils, token, augm
 
 def Embedding_Vis(data, 
                   data_name, 
-                  data_units = '',
-                  k_fold_number = 8,
+                  k_fold_number = None,
                   k_fold_index = 0,
                   augmentation = False, 
+                  indir = "../data/"
                   outdir = "../data/", 
                   affinity_propn = True, 
                   verbose = 0):
@@ -39,13 +41,39 @@ def Embedding_Vis(data,
     else:
         p_dir_temp = 'Can'
         
-    input_dir = outdir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
+    input_dir = indir+'Main/'+'{}/{}/'.format(data_name,p_dir_temp)
     save_dir = outdir+'Embedding_Vis/'+'{}/{}/'.format(data_name,p_dir_temp)
     os.makedirs(save_dir, exist_ok=True)
     
-    print("***SMILES_X for embedding visualization starts...***\n\n")
-    np.random.seed(seed=123)
-    seed_list = np.random.randint(int(1e6), size = k_fold_number).tolist()
+    for itype in ["txt","hdf5"]:
+        exists_file = glob.glob(input_dir + "*." + itype)
+        exists_file_len = len(exists_file)
+        if exists_file_len > 0:
+            if itype == "hdf5":
+                if k_fold_number is None:
+                    k_fold_number = exists_file_len
+        else:
+            print("***Process of inference automatically aborted!***")
+            if itype == "hdf5":
+                print("The input directory does not contain any trained models (*.hdf5 files).\n")
+            else:
+                print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).\n")
+            return
+        
+    if k_fold_index >= k_fold_number:
+        print("***Process of inference automatically aborted!***")
+        print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
+        return
+    
+    print("****************************************************")
+    print("***SMILES_X for embedding visualization starts...***")
+    print("****************************************************\n")
+    # Setting up the cross_validation on k-folds
+    kf = KFold(n_splits=k_fold_number, random_state=123, shuffle=True)
+    data_smiles = data.smiles.values
+    data_prop = data.iloc[:,1].values.reshape(-1,1)
+    kf.get_n_splits(data_smiles)
+    train_index, valid_test_index = kf.split(data_smiles)[k_fold_index]
         
     print("******")
     print("***Fold #{} initiated...***".format(k_fold_index))
@@ -53,11 +81,11 @@ def Embedding_Vis(data,
 
     print("***Sampling and splitting of the dataset.***\n")
     # Reproducing the data split of the requested fold (k_fold_index)
-    x_train, x_valid, x_test, y_train, y_valid, y_test, scaler = \
-    utils.random_split(smiles_input=data.smiles, 
-                       prop_input=np.array(data.iloc[:,1]), 
-                       random_state=seed_list[k_fold_index], 
-                       scaling = True)
+    x_train, x_valid, x_test, y_train, y_valid, y_test, * = \
+        utils.split_standardize(smiles_input = data_smiles, 
+                                prop_input = data_prop, 
+                                train_index = train_index, 
+                                valid_test_index = valid_test_index)
   
     # data augmentation or not
     if augmentation == True:
