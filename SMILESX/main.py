@@ -284,7 +284,7 @@ def Main(data,
                                 logger = logging.getLogger(__name__))
         
         # Save scaler for future usage (e.g. inference)
-        dump(scaler, open('scaler_fold_' + str(ifold) + '.pkl', 'wb'))
+        dump(scaler, open(save_dir+'scaler_fold_' + str(ifold) + '.pkl', 'wb'))
         
         x_train_enum, x_train_enum_card, y_train_enum = \
         augm.Augmentation(x_train, y_train, canon=canonical, rotate=rotation)
