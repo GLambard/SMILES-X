@@ -455,7 +455,7 @@ def Main(data,
                                                     lstmunits= best_arch[0], 
                                                     denseunits = best_arch[1], 
                                                     embedding = best_arch[2], 
-                                                    seed = best_arch[3])            
+                                                    seed = best_arch[3])      
             model_train.compile(loss="mse", optimizer=Adam(), metrics=[metrics.mae,metrics.mse])
         
         logging.info("Best model summary:")

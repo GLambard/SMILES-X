@@ -1,4 +1,4 @@
-from tensorflow.keras.models import Model
+from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Dense, Embedding, Bidirectional, TimeDistributed, LSTM
 #from tensorflow.compat.v1.keras.layers import CuDNNLSTM
 from tensorflow.keras.layers import Layer
@@ -68,7 +68,7 @@ class AttentionM(Layer):
 ##
     
 ## Neural architecture of the SMILES-X
-class LSTMAttModel():
+class LSTMAttModel:
     # Initialization
     # inputtokens: maximum length for the encoded and tokenized SMILES
     # vocabsize: size of the vocabulary
