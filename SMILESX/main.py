@@ -113,7 +113,7 @@ class DataSequence(Sequence):
 
 
 ## SMILESX main pipeline
-# data: provided data (numpy array of: (SMILES, property))
+# data: provided data (dataframe of: (SMILES, property))
 # data_name: dataset's name
 # bayopt_bounds: bounds contraining the Bayesian search of neural architectures
 # data_units: property's SI units

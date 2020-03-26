@@ -19,7 +19,7 @@ from SMILESX import utils, model, token, augm, main, inference
 from pickle import load
 
 ## Interpretation of the SMILESX predictions
-# data: provided data (numpy array of: (SMILES, property))
+# data: provided data (dataframe of: (SMILES, property))
 # data_name: dataset's name
 # data_units: property's SI units
 # k_fold_number: number of k-folds used for inference (Default: None, i.e. automatically detect k_fold_number from main.Main phase)
@@ -27,7 +27,6 @@ from pickle import load
 # augmentation: SMILES's augmentation (Default: False)
 # indir: directory of already trained prediction models (*.hdf5) and vocabulary (*.txt) (Default: '../data/')
 # outdir: directory for outputs (plots + .txt files) -> 'Interpretation/'+'{}/{}/'.format(data_name,p_dir_temp) is then created
-# smiles_toviz: targeted SMILES to visualize (Default: 'CCC')
 # font_size: font's size for writing SMILES tokens (Default: 15)
 # font_rotation: font's orientation (Default: 'horizontal')
 # returns:
@@ -49,18 +48,18 @@ class Interpretation:
                  indir = "../data/", 
                  outdir = "../data/", 
                  font_size = 15, 
-                 font_rotation = 'horizontal'):
+                 font_rotation = 'vertical'):
     
         self.data = data
         self.data_name = data_name
+        self.data_units = data_units
         self.k_fold_number = k_fold_number
         self.k_fold_index = k_fold_index
         self.augmentation = augmentation
         self.indir = indir
         self.outdir = outdir
-        self.smiles_list = smiles_list
         self.font_size = font_size
-        self.font_rotation = rotation
+        self.font_rotation = font_rotation
         
         self.Inference_class = inference.Inference(data_name = self.data_name, 
                                                    data_units = self.data_units,
@@ -78,156 +77,184 @@ class Interpretation:
         self.input_dir = self.indir+'Main/'+'{}/{}/'.format(self.data_name,p_dir_temp)
         self.save_dir = self.outdir+'Interpretation/'+'{}/{}/'.format(self.data_name,p_dir_temp)
         
-        if self.k_fold_index >= self.k_fold_number:
-            print("***Process of inference automatically aborted!***")
-            print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
-            return
+        if self.k_fold_index is not None and self.k_fold_number is not None:
+       # smiles_toviz: targeted SMILES to visualize (Default: 'CCC')     if self.k_fold_index >= self.k_fold_number:
+                print("***Process of inference automatically aborted!***")
+                print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
+                return
     
-    def Interpretation(self, smiles_list = ['CC','CCC','C=O']):
+    # smiles_list: targeted list of SMILES to visualize (Default: ['CC','CCC','C=O'])
+    # num_precision: numerical precision for displaying the predicted values (Default: 2)
+    def interpret(self, smiles_list = ['CC','CCC','C=O'], num_precision = 2):
 
         print("************************************")
         print("***SMILES_X Interpreter starts...***")
         print("************************************\n")
 
-        # Check the submitted SMILES
-        mol_toviz = Chem.MolFromSmiles(smiles_toviz)
-        if mol_toviz != None:
-            smiles_toviz_can = Chem.MolToSmiles(mol_toviz)
-        else:
-            print("***Process of visualization automatically aborted!***")
-            print("The submitted SMILES is incorrect and cannot be sanitized by RDKit.\n")
-            return
+#         # Check the submitted SMILES
+#         mol_toviz = Chem.MolFromSmiles(smiles_toviz)
+#         if mol_toviz != None:
+#             smiles_toviz_can = Chem.MolToSmiles(mol_toviz)
+#         else:
+#             print("***Process of visualization automatically aborted!***")
+#             print("The submitted SMILES is incorrect and cannot be sanitized by RDKit.\n")
+#             return
 
-        smiles_toviz_x = np.array([smiles_toviz_can])
-        if smiles_toviz_can in np.array(data.smiles):
-            smiles_toviz_y = np.array([[data.iloc[np.where(data.smiles == smiles_toviz_x[0])[0][0],1]]])
-            print("The submitted SMILES is found in the dataset used for training the models.\n")
-        else:
-            smiles_toviz_y = np.array([[np.nan]])
+#         smiles_toviz_x = np.array([smiles_toviz_can])
+#         if smiles_toviz_can in np.array(data.smiles):
+#             smiles_toviz_y = np.array([[data.iloc[np.where(data.smiles == smiles_toviz_x[0])[0][0],1]]])
+#             print("The submitted SMILES is found in the dataset used for training the models.\n")
+#         else:
+#             smiles_toviz_y = np.array([[np.nan]])
 
-        # data augmentation or not
-        if augmentation == True:
-            print("***Data augmentation is required.***\n")
-            canonical = False
-            rotation = True
-        else:
-            print("***No data augmentation is required.***\n")
-            canonical = True
-            rotation = False
+#         # data augmentation or not
+#         if augmentation == True:
+#             print("***Data augmentation is required.***\n")
+#             canonical = False
+#             rotation = True
+#         else:
+#             print("***No data augmentation is required.***\n")
+#             canonical = True
+#             rotation = False
 
-        smiles_toviz_x_enum, smiles_toviz_x_enum_card, smiles_toviz_y_enum = \
-        augm.Augmentation(smiles_toviz_x, smiles_toviz_y, canon=canonical, rotate=rotation)
+#         smiles_toviz_x_enum, smiles_toviz_x_enum_card, smiles_toviz_y_enum = \
+#         augm.Augmentation(smiles_toviz_x, smiles_toviz_y, canon=canonical, rotate=rotation)
 
-        # Submitted SMILES tokenization 
-        smiles_toviz_x_enum_tokens = token.get_tokens(smiles_toviz_x_enum)
+#         # Submitted SMILES tokenization 
+#         smiles_toviz_x_enum_tokens = token.get_tokens(smiles_toviz_x_enum)
 
-        # Vocabulary size computation
-        tokens = token.get_vocab(input_dir+data_name+'_Vocabulary.txt')
-        vocab_size = len(tokens)
-        # Add 'pad', 'unk' tokens to the existing list
-        tokens, vocab_size = token.add_extra_tokens(tokens, vocab_size)
+#         # Models ensembling
+#         for ifold in range(k_fold_number):
 
-        print("Usable vocabulary: {}\n, of size: {}\n".format(tokens, vocab_size))
+#             if k_fold_index is not None:
+#                 if ifold != k_fold_index:
+#                     continue
 
-        # Transformation of integers to tokens
-        int_to_token = token.get_inttotoken(tokens)
+#             # Load the scaler
+#             scaler = load(open('scaler_fold_' + str(ifold) + '.pkl', 'rb'))
 
-        # Models ensembling
-        for ifold in range(k_fold_number):
+#             # Best architecture to visualize from
+#             model_topredict = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
+#                                                   custom_objects={'AttentionM': model.AttentionM()})
+#             best_arch = [model_topredict.layers[2].output_shape[-1]/2, 
+#                          model_topredict.layers[3].output_shape[-1], 
+#                          model_topredict.layers[1].output_shape[-1]]
 
-            if k_fold_index is not None:
-                if ifold != k_fold_index:
-                    continue
+#             if ifold == 0:
+#                 # Maximum of length of SMILES to process
+#                 max_length = model_topredict.layers[0].output_shape[-1][1]
+#                 smiles_toviz_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list= smiles_toviz_x_enum_tokens, 
+#                                                                            max_length = max_length,
+#                                                                            vocab = tokens)
+#                 intermediate_output_array = np.empty(shape=(0, smiles_toviz_x_enum_card[0], max_lengh, 1), dtype='float')
+#                 smiles_y_pred_mean_array = np.empty(shape=(0,len(smiles_checked)), dtype='float')
 
-            # Load the scaler
-            scaler = load(open('scaler_fold_' + str(ifold) + '.pkl', 'rb'))
+#             # Architecture to return attention weights
+#             model_att = model.LSTMAttModel.create(inputtokens = max_length, 
+#                                                   vocabsize = vocab_size, 
+#                                                   lstmunits= int(best_arch[0]), 
+#                                                   denseunits = int(best_arch[1]), 
+#                                                   embedding = int(best_arch[2]), 
+#                                                   return_proba = True)
 
-            # Best architecture to visualize from
-            model_topredict = load_model(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
-                                                  custom_objects={'AttentionM': model.AttentionM()})
-            best_arch = [model_topredict.layers[2].output_shape[-1]/2, 
-                         model_topredict.layers[3].output_shape[-1], 
-                         model_topredict.layers[1].output_shape[-1]]
+#             model_att.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(k_fold_index)+'.hdf5')
+#     #    model_att.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
 
-            if ifold == 0:
-                # Maximum of length of SMILES to process
-                max_length = model_topredict.layers[0].output_shape[-1][1]
-                smiles_toviz_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list= smiles_toviz_x_enum_tokens, 
-                                                                           max_length = max_length,
-                                                                           vocab = tokens)
-                intermediate_output_array = np.empty(shape=(0, smiles_toviz_x_enum_card[0], max_lengh, 1), dtype='float')
-                smiles_y_pred_mean_array = np.empty(shape=(0,len(smiles_checked)), dtype='float')
+#             intermediate_layer_model = Model(inputs=model_att.input,
+#                                              outputs=model_att.layers[-2].output)
+#             intermediate_output = intermediate_layer_model.predict(smiles_toviz_x_enum_tokens_tointvec)
 
-            # Architecture to return attention weights
-            model_att = model.LSTMAttModel.create(inputtokens = max_length, 
-                                                  vocabsize = vocab_size, 
-                                                  lstmunits= int(best_arch[0]), 
-                                                  denseunits = int(best_arch[1]), 
-                                                  embedding = int(best_arch[2]), 
-                                                  return_proba = True)
+#             intermediate_output_array = np.append(intermediate_output_array, intermediate_output.reshape((1,)+intermediate_output.shape), axis = 0)
 
-            model_att.load_weights(input_dir+'LSTMAtt_'+data_name+'_model.best_fold_'+str(k_fold_index)+'.hdf5')
-    #    model_att.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
+#         intermediate_output = np.mean(intermediate_output_array, axis = 0)
+        
+        # Output shapes:
+        # Predictions: (batch_size,)
+        # attention maps: (batch_size, max_length)
+        # List of list of tokens: (batch_size) x (length of tokenized SMILES with padding)
+        y_pred_dataframe, att_map_mean, att_map_std, smiles_x_tokens = \
+            self.Inference_class.infer(smiles_list, check_smiles = True, return_att = True)
+        smiles_x_retrieval = [''.join(ismiles[1:-1]) for ismiles in smiles_x_tokens]
+        smiles_list_len = len(smiles_x_retrieval)
+        smiles_x_tokens_len = [len(ismiles) for ismiles in smiles_x_tokens]
+        y_true = np.zeros((smiles_list_len,), dtype='float')
+        for ismiles, smiles_tmp in enumerate(smiles_x_retrieval):
+            if smiles_tmp in self.data.smiles.values.tolist():
+                y_true[ismiles] = self.data.iloc[np.where(self.data.smiles == smiles_tmp)[0][0],1]
+            else:
+                y_true[ismiles] = np.nan
 
-            intermediate_layer_model = Model(inputs=model_att.input,
-                                             outputs=model_att.layers[-2].output)
-            intermediate_output = intermediate_layer_model.predict(smiles_toviz_x_enum_tokens_tointvec)
+#         smiles_toviz_x_card_cumsum_viz = np.cumsum(smiles_toviz_x_enum_card)
+#         smiles_toviz_x_card_cumsum_shift_viz = shift(smiles_toviz_x_card_cumsum_viz, 1, cval=0)
 
-            intermediate_output_array = np.append(intermediate_output_array, intermediate_output.reshape((1,)+intermediate_output.shape), axis = 0)
+#         mols_id = 0
+#         ienumcard = smiles_toviz_x_card_cumsum_shift_viz[mols_id]
 
-        intermediate_output = np.mean(intermediate_output_array, axis = 0)
+#         smiles_len_tmp = len(smiles_toviz_x_enum_tokens[ienumcard])
+#         intermediate_output_tmp = intermediate_output[ienumcard,-smiles_len_tmp+1:-1].flatten().reshape(1,-1)
+        
+        # these are matplotlib.patch.Patch properties
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        
+        for ismiles in range(smiles_list_len): 
+            
+            fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(20,10))
+            #fig.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            fig.suptitle('SMILES: {}'.format(smiles_x_retrieval[ismiles]), fontsize = 16)
+            # Predictions
+            value_toprint = "Predicted value: {1:.{0}f} +/- {2:.{0}f} {3}".format(num_precision, 
+                                                                                  y_pred_dataframe.iloc[ismiles,1], 
+                                                                                  y_pred_dataframe.iloc[ismiles,2], 
+                                                                                  self.data_units)
+            #if not np.isnan(y_true[ismiles]):
+            value_toprint += "\nExp/Sim value: {1:.{0}f} {2}".format(num_precision, 
+                                                                     y_true[ismiles], 
+                                                                     self.data_units)
+            
+            axes[0,0].text(0.05, 0.95, value_toprint, 
+                                 transform=axes[0,0].transAxes, 
+                                 fontsize=self.font_size,
+                                 verticalalignment='top', bbox=props)
+            axes[0,0].axis('off')
+            
+            # 1D attention maps
+            smiles_tmp = smiles_x_tokens[ismiles]
+            smiles_len_tmp = smiles_x_tokens_len[ismiles]
+            axes[0,1].matshow(att_map_mean[ismiles,-smiles_len_tmp+1:-1].flatten().reshape(1,-1), cmap='Reds') # SMILES padding excluded
+            axes[0,1].tick_params(axis='x', bottom = False)
+            axes[0,1].set_xticks(np.arange(smiles_len_tmp-2))
+            axes[0,1].set_xticklabels(smiles_tmp[1:-1], fontsize = self.font_size, rotation = self.font_rotation)
+            axes[0,1].set_yticks([])
+            #plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
 
-        smiles_toviz_x_card_cumsum_viz = np.cumsum(smiles_toviz_x_enum_card)
-        smiles_toviz_x_card_cumsum_shift_viz = shift(smiles_toviz_x_card_cumsum_viz, 1, cval=0)
+#         smiles_tmp = smiles_toviz_x_enum[ienumcard]
+#         mol_tmp = Chem.MolFromSmiles(smiles_tmp)
+#         mol_df_tmp = pd.DataFrame([smiles_toviz_x_enum_tokens[ienumcard][1:-1],intermediate_output[ienumcard].\
+#                                    flatten().\
+#                                    tolist()[-smiles_len_tmp+1:-1]]).transpose()
+#         bond = ['-','=','#','$','/','\\','.','(',')']
+#         mol_df_tmp = mol_df_tmp[~mol_df_tmp.iloc[:,0].isin(bond)]
+#         mol_df_tmp = mol_df_tmp[[not itoken.isdigit() for itoken in mol_df_tmp.iloc[:,0].values.tolist()]]
 
-        mols_id = 0
-        ienumcard = smiles_toviz_x_card_cumsum_shift_viz[mols_id]
+#         minmaxscaler = MinMaxScaler(feature_range=(0,1))
+#         norm_weights = minmaxscaler.fit_transform(mol_df_tmp.iloc[:,1].values.reshape(-1,1)).flatten().tolist()
+#         fig = GetSimilarityMapFromWeights(mol=mol_tmp, 
+#                                           size = (250,250), 
+#                                           scale=-1,  
+#                                           sigma=0.05,
+#                                           weights=norm_weights, 
+#                                           colorMap='Reds', 
+#                                           contourLines = 10,
+#                                           alpha = 0.25)
+#         fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
 
-        smiles_len_tmp = len(smiles_toviz_x_enum_tokens[ienumcard])
-        intermediate_output_tmp = intermediate_output[ienumcard,-smiles_len_tmp+1:-1].flatten().reshape(1,-1)
-
-        plt.matshow(intermediate_output_tmp, 
-                    cmap='Reds')
-        plt.tick_params(axis='x', bottom = False)
-        plt.xticks([ix for ix in range(smiles_len_tmp-2)])
-        plt.xticks(range(smiles_len_tmp-2), 
-                   [int_to_token[iint].replace('pad','') \
-                    for iint in smiles_toviz_x_enum_tokens_tointvec[ienumcard,-smiles_len_tmp+1:-1]], 
-                   fontsize = font_size, 
-                   rotation = font_rotation)
-        plt.yticks([])
-        plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-
-        smiles_tmp = smiles_toviz_x_enum[ienumcard]
-        mol_tmp = Chem.MolFromSmiles(smiles_tmp)
-        mol_df_tmp = pd.DataFrame([smiles_toviz_x_enum_tokens[ienumcard][1:-1],intermediate_output[ienumcard].\
-                                   flatten().\
-                                   tolist()[-smiles_len_tmp+1:-1]]).transpose()
-        bond = ['-','=','#','$','/','\\','.','(',')']
-        mol_df_tmp = mol_df_tmp[~mol_df_tmp.iloc[:,0].isin(bond)]
-        mol_df_tmp = mol_df_tmp[[not itoken.isdigit() for itoken in mol_df_tmp.iloc[:,0].values.tolist()]]
-
-        minmaxscaler = MinMaxScaler(feature_range=(0,1))
-        norm_weights = minmaxscaler.fit_transform(mol_df_tmp.iloc[:,1].values.reshape(-1,1)).flatten().tolist()
-        fig = GetSimilarityMapFromWeights(mol=mol_tmp, 
-                                          size = (250,250), 
-                                          scale=-1,  
-                                          sigma=0.05,
-                                          weights=norm_weights, 
-                                          colorMap='Reds', 
-                                          contourLines = 10,
-                                          alpha = 0.25)
-        fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-
-    #    model_topredict.compile(loss="mse", optimizer='adam', metrics=[metrics.mae,metrics.mse])
-
-        y_pred_test_tmp = model_topredict.predict(smiles_toviz_x_enum_tokens_tointvec[ienumcard].reshape(1,-1))[0,0]
-        y_test_tmp = smiles_toviz_y_enum[ienumcard,0]
-        if not np.isnan(y_test_tmp):
-            print("True value: {0:.2f} Predicted: {1:.2f}".format(y_test_tmp,
-                                                        scaler.inverse_transform(y_pred_test_tmp.reshape(1, -1))[0][0]))
-        else:
-            print("Predicted: {0:.2f}".format(scaler.inverse_transform(y_pred_test_tmp.reshape(1,-1))[0][0]))
+#         y_pred_test_tmp = model_topredict.predict(smiles_toviz_x_enum_tokens_tointvec[ienumcard].reshape(1,-1))[0,0]
+#         y_test_tmp = smiles_toviz_y_enum[ienumcard,0]
+#         if not np.isnan(y_test_tmp):
+#             print("True value: {0:.2f} Predicted: {1:.2f}".format(y_test_tmp,
+#                                                         scaler.inverse_transform(y_pred_test_tmp.reshape(1, -1))[0][0]))
+#         else:
+#             print("Predicted: {0:.2f}".format(scaler.inverse_transform(y_pred_test_tmp.reshape(1,-1))[0][0]))
 
     #     diff_topred_list = list()
     #     diff_totrue_list = list()

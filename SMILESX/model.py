@@ -1,4 +1,4 @@
-from tensorflow.keras import Model
+from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Embedding, Bidirectional, TimeDistributed, LSTM
 #from tensorflow.compat.v1.keras.layers import CuDNNLSTM
 from tensorflow.keras.layers import Layer

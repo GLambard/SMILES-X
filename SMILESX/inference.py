@@ -5,8 +5,9 @@ import glob
 
 from rdkit import Chem
 
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Model, load_model
 from tensorflow.keras import metrics
+from tensorflow.keras import backend as K
 
 from SMILESX import utils, model, token, augm, main
 
@@ -24,7 +25,10 @@ from pickle import load
 # gpus_debug: print out the GPUs ongoing usage 
 # return_attention: additionally return the attention map for interpretation (Default: False)
 # returns:
-#         Array of SMILES with their inferred property (mean, standard deviation) from models ensembling
+#         Dataframe of SMILES with their inferred property (SMILES, mean, standard deviation) from models ensembling
+#      and,
+#         if return_attention == True:
+#            Two arrays of attention maps (mean, standard deviation) from models ensembling
 class Inference:
 
     def __init__(self, 
@@ -97,12 +101,13 @@ class Inference:
         # Add 'pad', 'unk' tokens to the existing list
         vocab_size = len(self.tokens)
         self.tokens, vocab_size = token.add_extra_tokens(self.tokens, vocab_size)
-        print("Full vocabulary: {}, of size: {}.\n".format(self.tokens, vocab_size))
+        print("Full vocabulary: {}, of size: {}.".format(self.tokens, vocab_size))
         
         for ifold in range(self.k_fold_number):
             # Load the scaler
             self.scalers_list.append(load(open(self.input_dir+'scaler_fold_' + str(ifold) + '.pkl', 'rb')))
 
+            K.clear_session()
             # Model's architecture
             model_tmp = load_model(self.input_dir+'LSTMAtt_'+self.data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
                                    custom_objects={'AttentionM': model.AttentionM()})
@@ -111,21 +116,25 @@ class Inference:
             # max_length retrieval
             if ifold == 0:
                 # Maximum of length of SMILES to process
-                self.max_length = model_tmp[0].layers[0].output_shape[-1][1]
-                print("Maximum length of tokenized SMILES: {} tokens.".format(self.max_length))
+                self.max_length = self.models_list[0].layers[0].output_shape[-1][1]
+                print("Maximum length of tokenized SMILES: {} tokens.\n".format(self.max_length))
             
             if self.return_attention is True:
-                best_arch = [model_tmp.layers[2].output_shape[-1]/2, 
+                best_arch = [model_tmp.layers[2].output_shape[-1]//2, 
                              model_tmp.layers[3].output_shape[-1], 
                              model_tmp.layers[1].output_shape[-1]]
                 # Architecture to return attention weights
+                K.clear_session()
                 att_tmp = model.LSTMAttModel.create(inputtokens = self.max_length, 
                                                     vocabsize = vocab_size, 
-                                                    lstmunits= int(best_arch[0]), 
-                                                    denseunits = int(best_arch[1]), 
-                                                    embedding = int(best_arch[2]), 
+                                                    lstmunits= best_arch[0], 
+                                                    denseunits = best_arch[1], 
+                                                    embedding = best_arch[2], 
                                                     return_proba = True)
-                att_tmp.load_weights(self.input_dir+'LSTMAtt_'+self.data_name+'_model.best_fold_'+str(ifold)+'.hdf5')
+                if ifold > 0:
+                    att_tmp.load_weights(self.input_dir+'LSTMAtt_'+self.data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
+                                         by_name= True, 
+                                         skip_mismatch = True)
 
                 intermediate_layer_model = Model(inputs = att_tmp.input,
                                                  outputs = att_tmp.layers[-2].output)
@@ -142,7 +151,8 @@ class Inference:
 
     # smiles_list: targeted SMILES list for property inference (Default: ['CC','CCC','C=O'])
     # check_smiles: check the SMILES' correctness via RDKit (Default: True)
-    def infer(self, smiles_list = ['CC','CCC','C=O'], check_smiles = True):
+    # return_att: return the attention map for interpretation (Default: False), i.e. Interpretation init => Infer alone, or Infer + Att map
+    def infer(self, smiles_list = ['CC','CCC','C=O'], check_smiles = True, return_att = False):
         
         if self.return_attention is False:
             print("**************************************")
@@ -212,7 +222,7 @@ class Inference:
             smiles_y_pred_mean_array = np.append(smiles_y_pred_mean_array, smiles_y_pred_mean.reshape(1,-1), axis = 0)
 
             # Return average attention map
-            if self.return_attention:     
+            if self.return_attention is True and return_att is True:     
                 # extract only one attention map per non-enumerated SMILES of shape (batch_size, max_length)
                 smiles_att = np.squeeze(self.att_list[ifold].predict(smiles_x_tokens_tointvec), axis=2)
                 
@@ -220,23 +230,27 @@ class Inference:
             
             if ifold == (self.k_fold_number-1):
                 
-                    smiles_y_pred_mean_ensemble = np.mean(smiles_y_pred_mean_array, axis = 0)
-                    smiles_y_pred_sd_ensemble = np.std(smiles_y_pred_mean_array, axis = 0)
+                # Mean and standard deviation on predictions from models ensembling
+                # Shape: (batch_size,)
+                smiles_y_pred_mean_ensemble = np.mean(smiles_y_pred_mean_array, axis = 0)
+                smiles_y_pred_sd_ensemble = np.std(smiles_y_pred_mean_array, axis = 0)
 
-                    pred_from_ens = pd.DataFrame(data=[smiles_x,
-                                                       smiles_y_pred_mean_ensemble,
-                                                       smiles_y_pred_sd_ensemble]).T
-                    pred_from_ens.columns = ['SMILES', 'ens_pred_mean', 'ens_pred_sd']
+                pred_from_ens = pd.DataFrame(data=[smiles_x,
+                                                   smiles_y_pred_mean_ensemble,
+                                                   smiles_y_pred_sd_ensemble]).T
+                pred_from_ens.columns = ['SMILES', 'ens_pred_mean', 'ens_pred_sd']
 
-                if self.return_attention is False:
+                if self.return_attention is True and return_att is True:
+                    # Mean and standard deviation on attention maps from models ensembling
+                    # Shape: (batch_size, max_length)
                     smiles_att_mean_ensemble = np.mean(smiles_att_map_array, axis = 0)
                     smiles_att_std_ensemble = np.std(smiles_att_map_array, axis = 0)
-                    
-                    return pred_from_ens, smiles_att_mean_ensemble, smiles_att_std_ensemble
+
+                    return pred_from_ens, smiles_att_mean_ensemble, smiles_att_std_ensemble, smiles_x_tokens
                 else:
                     print("****************************************")
                     print("***Inference of SMILES property done.***")
                     print("****************************************\n")
-                    
+
                     return pred_from_ens
 ##
