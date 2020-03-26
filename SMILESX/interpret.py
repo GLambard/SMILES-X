@@ -18,6 +18,8 @@ from SMILESX import utils, model, token, augm, main, inference
 
 from pickle import load
 
+from PIL import Image
+
 ## Interpretation of the SMILESX predictions
 # data: provided data (dataframe of: (SMILES, property))
 # data_name: dataset's name
@@ -199,26 +201,26 @@ class Interpretation:
         for ismiles in range(smiles_list_len): 
             
             fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(20,10))
-            #fig.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
             fig.suptitle('SMILES: {}'.format(smiles_x_retrieval[ismiles]), fontsize = 16)
+            
             # Predictions
             value_toprint = "Predicted value: {1:.{0}f} +/- {2:.{0}f} {3}".format(num_precision, 
                                                                                   y_pred_dataframe.iloc[ismiles,1], 
                                                                                   y_pred_dataframe.iloc[ismiles,2], 
                                                                                   self.data_units)
-            #if not np.isnan(y_true[ismiles]):
             value_toprint += "\nExp/Sim value: {1:.{0}f} {2}".format(num_precision, 
                                                                      y_true[ismiles], 
                                                                      self.data_units)
             
-            axes[0,0].text(0.05, 0.95, value_toprint, 
+            axes[0,0].text(0.5, 0.5, value_toprint, 
                                  transform=axes[0,0].transAxes, 
                                  fontsize=self.font_size,
                                  verticalalignment='top', bbox=props)
             axes[0,0].axis('off')
             
-            # 1D attention maps
             smiles_tmp = smiles_x_tokens[ismiles]
+            
+            # 1D attention map
             smiles_len_tmp = smiles_x_tokens_len[ismiles]
             axes[0,1].matshow(att_map_mean[ismiles,-smiles_len_tmp+1:-1].flatten().reshape(1,-1), cmap='Reds') # SMILES padding excluded
             axes[0,1].tick_params(axis='x', bottom = False)
@@ -227,34 +229,28 @@ class Interpretation:
             axes[0,1].set_yticks([])
             #plt.savefig(save_dir+'Interpretation_1D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
 
-#         smiles_tmp = smiles_toviz_x_enum[ienumcard]
-#         mol_tmp = Chem.MolFromSmiles(smiles_tmp)
-#         mol_df_tmp = pd.DataFrame([smiles_toviz_x_enum_tokens[ienumcard][1:-1],intermediate_output[ienumcard].\
-#                                    flatten().\
-#                                    tolist()[-smiles_len_tmp+1:-1]]).transpose()
-#         bond = ['-','=','#','$','/','\\','.','(',')']
-#         mol_df_tmp = mol_df_tmp[~mol_df_tmp.iloc[:,0].isin(bond)]
-#         mol_df_tmp = mol_df_tmp[[not itoken.isdigit() for itoken in mol_df_tmp.iloc[:,0].values.tolist()]]
+            # 2D attention map
+            mol_tmp = Chem.MolFromSmiles(smiles_x_retrieval[ismiles])
+            mol_df_tmp = pd.DataFrame([smiles_tmp[1:-1], att_map_mean[ismiles].\
+                                       flatten().\
+                                       tolist()[-smiles_len_tmp+1:-1]]).transpose()
+            bond = ['-','=','#','$','/','\\','.','(',')']
+            mol_df_tmp = mol_df_tmp[~mol_df_tmp.iloc[:,0].isin(bond)]
+            mol_df_tmp = mol_df_tmp[[not itoken.isdigit() for itoken in mol_df_tmp.iloc[:,0].values.tolist()]]
 
-#         minmaxscaler = MinMaxScaler(feature_range=(0,1))
-#         norm_weights = minmaxscaler.fit_transform(mol_df_tmp.iloc[:,1].values.reshape(-1,1)).flatten().tolist()
-#         fig = GetSimilarityMapFromWeights(mol=mol_tmp, 
-#                                           size = (250,250), 
-#                                           scale=-1,  
-#                                           sigma=0.05,
-#                                           weights=norm_weights, 
-#                                           colorMap='Reds', 
-#                                           contourLines = 10,
-#                                           alpha = 0.25)
-#         fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
-
-#         y_pred_test_tmp = model_topredict.predict(smiles_toviz_x_enum_tokens_tointvec[ienumcard].reshape(1,-1))[0,0]
-#         y_test_tmp = smiles_toviz_y_enum[ienumcard,0]
-#         if not np.isnan(y_test_tmp):
-#             print("True value: {0:.2f} Predicted: {1:.2f}".format(y_test_tmp,
-#                                                         scaler.inverse_transform(y_pred_test_tmp.reshape(1, -1))[0][0]))
-#         else:
-#             print("Predicted: {0:.2f}".format(scaler.inverse_transform(y_pred_test_tmp.reshape(1,-1))[0][0]))
+            minmaxscaler = MinMaxScaler(feature_range=(0,1))
+            norm_weights = minmaxscaler.fit_transform(mol_df_tmp.iloc[:,1].values.reshape(-1,1)).flatten().tolist()
+            fig_tmp = GetSimilarityMapFromWeights(mol=mol_tmp, 
+                                              size = (250,250), 
+                                              scale=-1,  
+                                              sigma=0.05,
+                                              weights=norm_weights, 
+                                              colorMap='Reds', 
+                                              contourLines = 10,
+                                              alpha = 0.25)
+            fig_tmp.canvas.draw()
+            axes[1,0].imshow(np.array(fig_tmp.canvas.renderer.buffer_rgba()))
+            #fig.savefig(save_dir+'Interpretation_2D_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
 
     #     diff_topred_list = list()
     #     diff_totrue_list = list()
@@ -288,6 +284,35 @@ class Interpretation:
     #     plt.savefig(save_dir+'Interpretation_temporal_'+data_name+'_fold_'+str(k_fold_index)+'.png', bbox_inches='tight')
 ##
 
+
+def fig2data (fig):
+    """
+    @brief Convert a Matplotlib figure to a 4D numpy array with RGBA channels and return it
+    @param fig a matplotlib figure
+    @return a numpy 3D array of RGBA values
+    """
+    # draw the renderer
+    fig.canvas.draw()
+ 
+    # Get the RGBA buffer from the figure
+    w,h = fig.canvas.get_width_height()
+    buf = np.fromstring(fig.canvas.tostring_argb(), dtype=np.uint8)
+    buf.shape = (w,h,4)
+ 
+    # canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
+    buf = np.roll(buf, 3, axis = 2)
+    return buf
+
+def fig2img (fig):
+    """
+    @brief Convert a Matplotlib figure to a PIL Image in RGBA format and return it
+    @param fig a matplotlib figure
+    @return a Python Imaging Library ( PIL ) image
+    """
+    # put the figure pixmap into a numpy array
+    buf = fig2data (fig)
+    w, h, d = buf.shape
+    return Image.frombytes( "RGBA", ( w ,h ), buf.tostring() )
 
 ## Attention weights depiction
 # from https://github.com/rdkit/rdkit/blob/24f1737839c9302489cadc473d8d9196ad9187b4/rdkit/Chem/Draw/SimilarityMaps.py
