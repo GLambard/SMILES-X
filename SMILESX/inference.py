@@ -17,6 +17,7 @@ from pickle import load
 # data_name: dataset's name
 # data_units: property's SI units
 # k_fold_number: number of k-folds used for inference (Default: None, i.e. automatically detect k_fold_number from main.Main phase)
+# k_fold_index: k-fold index to be used for visualization (Default: None, i.e. use all the models, then average)
 # augmentation: SMILES's augmentation (Default: False)
 # indir: directory of already trained prediction models (*.hdf5) and vocabulary (*.txt) (Default: '../data/')
 # outdir: directory for outputs (plots + .txt files) -> 'Inference/'+'{}/{}/'.format(data_name,p_dir_temp) is then created (Default: '../data/')
@@ -35,6 +36,7 @@ class Inference:
                  data_name, 
                  data_units = '',
                  k_fold_number = None,
+                 k_fold_index = None, 
                  augmentation = False, 
                  indir = "../data/", 
                  outdir = "../data/", 
@@ -46,6 +48,7 @@ class Inference:
         self.data_name = data_name
         self.data_units = data_units
         self.k_fold_number = k_fold_number
+        self.k_fold_index = k_fold_index
         self.augmentation = augmentation
         self.return_attention = return_attention
         
@@ -103,7 +106,18 @@ class Inference:
         self.tokens, vocab_size = token.add_extra_tokens(self.tokens, vocab_size)
         print("Full vocabulary: {}, of size: {}.".format(self.tokens, vocab_size))
         
+        if self.k_fold_index is not None and self.k_fold_number is not None:
+            if self.k_fold_index >= self.k_fold_number:
+                print("***Process of inference automatically aborted!***")
+                print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
+                return
+        
         for ifold in range(self.k_fold_number):
+            
+            if self.k_fold_index is not None:
+                if ifold != self.k_fold_index:
+                    continue
+            
             # Load the scaler
             self.scalers_list.append(load(open(self.input_dir+'scaler_fold_' + str(ifold) + '.pkl', 'rb')))
 
@@ -114,7 +128,7 @@ class Inference:
             self.models_list.append(model_tmp)
             
             # max_length retrieval
-            if ifold == 0:
+            if (ifold == 0) or (ifold == self.k_fold_index):
                 # Maximum of length of SMILES to process
                 self.max_length = self.models_list[0].layers[0].output_shape[-1][1]
                 print("Maximum length of tokenized SMILES: {} tokens.\n".format(self.max_length))
@@ -131,10 +145,10 @@ class Inference:
                                                     denseunits = best_arch[1], 
                                                     embedding = best_arch[2], 
                                                     return_proba = True)
-                if ifold > 0:
-                    att_tmp.load_weights(self.input_dir+'LSTMAtt_'+self.data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
-                                         by_name= True, 
-                                         skip_mismatch = True)
+
+                att_tmp.load_weights(self.input_dir+'LSTMAtt_'+self.data_name+'_model.best_fold_'+str(ifold)+'.hdf5', 
+                                     by_name= True, 
+                                     skip_mismatch = True)
 
                 intermediate_layer_model = Model(inputs = att_tmp.input,
                                                  outputs = att_tmp.layers[-2].output)
@@ -188,20 +202,26 @@ class Inference:
         smiles_x = np.array(smiles_checked)
         smiles_y = np.array([[np.nan]*smiles_checked_len]).flatten()
 
-        smiles_x_enum, smiles_x_enum_card, smiles_y_enum = \
-        augm.Augmentation(smiles_x, smiles_y, canon=self.canonical, rotate=self.rotation)
+        if check_smiles:
+            smiles_x_enum, smiles_x_enum_card, _ = augm.Augmentation(smiles_x, smiles_y, 
+                                                                     canon=self.canonical, 
+                                                                     rotate=self.rotation)
 
-        print("Number of enumerated SMILES: {}.".format(smiles_x_enum.shape[0]))
+            print("Number of enumerated SMILES: {}.".format(smiles_x_enum.shape[0]))
 
-        print("Tokenization of SMILES.\n")
+            print("Tokenization of SMILES.\n")
+            
+            # Tokenize SMILES 
+            smiles_x_enum_tokens = token.get_tokens(smiles_x_enum)
+            
+            # Encode the tokens to integers from enumerated SMILES
+            smiles_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = smiles_x_enum_tokens, 
+                                                                 max_length = self.max_length, 
+                                                                 vocab = self.tokens)
+            
         # Tokenize SMILES 
-        smiles_x_enum_tokens = token.get_tokens(smiles_x_enum)
         smiles_x_tokens = token.get_tokens(smiles_x)
 
-        # Encode the tokens to integers from enumerated SMILES
-        smiles_x_enum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = smiles_x_enum_tokens, 
-                                                             max_length = self.max_length, 
-                                                             vocab = self.tokens)
         # Encode the tokens to integers from non-enumerated SMILES
         smiles_x_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = smiles_x_tokens, 
                                                         max_length = self.max_length, 
@@ -211,11 +231,18 @@ class Inference:
         smiles_y_pred_mean_array = np.empty(shape=(0,smiles_checked_len), dtype='float')
         smiles_att_map_array = np.empty(shape=(0,smiles_checked_len,self.max_length), dtype='float')
         for ifold in range(self.k_fold_number):
-                
+            
+            if self.k_fold_index is not None:
+                if ifold != self.k_fold_index:
+                    continue
+            
             # predict and compare for the training, validation and test sets
-            smiles_y_pred = self.models_list[ifold].predict(smiles_x_enum_tokens_tointvec)
             # compute a mean per set of augmented SMILES
-            smiles_y_pred_mean, _ = utils.mean_median_result(smiles_x_enum_card, smiles_y_pred)
+            if check_smiles:
+                smiles_y_pred = self.models_list[ifold].predict(smiles_x_enum_tokens_tointvec)
+                smiles_y_pred_mean, _ = utils.mean_median_result(smiles_x_enum_card, smiles_y_pred)
+            else:
+                smiles_y_pred_mean = self.models_list[ifold].predict(smiles_x_tokens_tointvec)
             # unscale prediction's outcomes
             smiles_y_pred_mean = self.scalers_list[ifold].inverse_transform(smiles_y_pred_mean.reshape(-1,1))
 
@@ -228,7 +255,7 @@ class Inference:
                 
                 smiles_att_map_array = np.append(smiles_att_map_array, smiles_att.reshape(1,smiles_checked_len,self.max_length), axis = 0)
             
-            if ifold == (self.k_fold_number-1):
+            if (ifold == (self.k_fold_number-1)) or (ifold == self.k_fold_index):
                 
                 # Mean and standard deviation on predictions from models ensembling
                 # Shape: (batch_size,)
@@ -248,9 +275,10 @@ class Inference:
 
                     return pred_from_ens, smiles_att_mean_ensemble, smiles_att_std_ensemble, smiles_x_tokens
                 else:
-                    print("****************************************")
-                    print("***Inference of SMILES property done.***")
-                    print("****************************************\n")
+                    if self.return_attention is False:
+                        print("****************************************")
+                        print("***Inference of SMILES property done.***")
+                        print("****************************************\n")
 
                     return pred_from_ens
 ##

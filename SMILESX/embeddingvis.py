@@ -59,11 +59,12 @@ def Embedding_Vis(data,
             else:
                 print("The input directory does not contain any vocabulary (*_Vocabulary.txt file).\n")
             return
-        
-    if k_fold_index >= k_fold_number:
-        print("***Process of inference automatically aborted!***")
-        print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
-        return
+    
+    if k_fold_index is not None and k_fold_number is not None: 
+        if k_fold_index >= k_fold_number:
+            print("***Process of inference automatically aborted!***")
+            print("The condition \"0 <= k_fold_index < k_fold_number\" is not respected.\n")
+            return
     
     print("****************************************************")
     print("***SMILES_X for embedding visualization starts...***")
