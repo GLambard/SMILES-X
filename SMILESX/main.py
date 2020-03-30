@@ -362,9 +362,13 @@ def Main(data,
         logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n") 
         
         if batchsize_pergpu is None:
-            batch_size_list = np.array([int(2**itn) for itn in range(3,11)])
-            batchsize_pergpu = batch_size_list[np.argmax((batch_size_list // np.max(x_train_enum_card)) == 1.)]
+            if augmentation:
+                batch_size_list = np.array([int(2**itn) for itn in range(3,11)])
+                batchsize_pergpu = batch_size_list[np.argmax((batch_size_list // np.max(x_train_enum_card)) == 1.)]
+            else: 
+                batchsize_pergpu = 64 # reference batch size if augmentation is not required and batchsize_pergpu is not defined
         batch_size = batchsize_pergpu * strategy.num_replicas_in_sync
+        logging.info("Total fixed batch size: {} ({} / gpu)\n".format(batch_size, batchsize_pergpu))
         
         if bayopt_on:
             # Operate the bayesian optimization of the neural architecture
