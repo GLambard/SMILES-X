@@ -295,6 +295,9 @@ def Main(data,
         x_test_enum, x_test_enum_card, y_test_enum = \
         augm.Augmentation(x_test, y_test, canon=canonical, rotate=rotation)
         
+        # Non-enumerated training set for architecture search
+        x_train_noenum, x_train_noenum_card, _ = augm.Augmentation(x_train, y_train, canon=True, rotate=False)
+        
         logging.info("Enumerated SMILES:\n\tTraining set: {}\n\tValidation set: {}\n\tTest set: {}\n".\
         format(x_train_enum.shape[0], x_valid_enum.shape[0], x_test_enum.shape[0]))
         
@@ -303,6 +306,8 @@ def Main(data,
         x_train_enum_tokens = token.get_tokens(x_train_enum)
         x_valid_enum_tokens = token.get_tokens(x_valid_enum)
         x_test_enum_tokens = token.get_tokens(x_test_enum)
+        
+        x_train_noenum_tokens = token.get_tokens(x_train_noenum)
         
         logging.info("Examples of tokenized SMILES from a training set:\n{}\n".\
         format(x_train_enum_tokens[:5]))
@@ -359,6 +364,10 @@ def Main(data,
                                                            max_length = max_length+1, 
                                                            vocab = tokens)
         
+        x_train_noenum_tokens_tointvec = token.int_vec_encode(tokenized_smiles_list = x_train_noenum_tokens, 
+                                                              max_length = max_length+1, 
+                                                              vocab = tokens)
+        
         logging.info("***Bayesian Optimization of the SMILESX's architecture.***\n") 
         
         if batchsize_pergpu is None:
@@ -388,9 +397,9 @@ def Main(data,
                                                                   denseunits = params[1], 
                                                                   embedding = params[2], 
                                                                   seed = iseed)
-                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size//strategy.num_replicas_in_sync)
+                            y_pred_train_tmp = model_opt.predict(x_train_noenum_tokens_tointvec, batch_size//strategy.num_replicas_in_sync)
                         with tf.device('/CPU:0'):
-                            y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
+                            y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_noenum_card, y_pred_train_tmp)  
                             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
                             mse_train_tmp.append(np.mean(np.square(y_pred_VS_true_train_tmp)))
                     mse_train_mean_tmp = np.mean(mse_train_tmp)
@@ -432,9 +441,9 @@ def Main(data,
                                                                   denseunits = best_arch[1], 
                                                                   embedding = best_arch[2], 
                                                                   seed = iseed)
-                            y_pred_train_tmp = model_opt.predict(x_train_enum_tokens_tointvec, batch_size//strategy.num_replicas_in_sync)
+                            y_pred_train_tmp = model_opt.predict(x_train_noenum_tokens_tointvec, batch_size//strategy.num_replicas_in_sync)
                         with tf.device('/CPU:0'):
-                            y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_enum_card, y_pred_train_tmp)  
+                            y_pred_train_mean_tmp, _ = utils.mean_median_result(x_train_noenum_card, y_pred_train_tmp)  
                             y_pred_VS_true_train_tmp = y_train - y_pred_train_mean_tmp.reshape(-1,1)
                             mse_train_tmp.append(np.mean(np.square(y_pred_VS_true_train_tmp)))
                     best_seed = seed_list[np.argmin(mse_train_tmp)]
@@ -508,7 +517,10 @@ def Main(data,
                                   epochs = n_epochs, 
                                   shuffle = True,
                                   callbacks = callbacks_list, 
-                                  verbose = verbose)
+                                  verbose = verbose, 
+                                  max_queue_size = batch_size, 
+                                  use_multiprocessing = False, 
+                                  workers = 1)
 
         # Summarize history for losses per epoch
         plt.plot(history.history['loss'])

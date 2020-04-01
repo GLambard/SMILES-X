@@ -14,6 +14,7 @@ from sklearn.preprocessing import RobustScaler
 from scipy.ndimage.interpolation import shift
 
 from tensorflow.keras.callbacks import Callback
+import time
 
 np.set_printoptions(precision=3)
 
@@ -131,8 +132,14 @@ class LoggingCallback(Callback):
     def __init__(self, print_fcn=print):
         Callback.__init__(self)
         self.print_fcn = print_fcn
+        self.start = 0
 
+    def on_epoch_begin(self, epoch, logs={}):
+        self.start = time.time()
+        
     def on_epoch_end(self, epoch, logs={}):
-        msg = "{Epoch: %i} %s" % (epoch, ", ".join("%s: %f" % (k, v) for k, v in logs.items()))
+        msg = "{Epoch: %i} duration: %.3f secs %s" % (epoch, 
+                                                     time.time()-self.start, 
+                                                     ", ".join("%s: %f" % (k, v) for k, v in logs.items()))
         self.print_fcn(msg)
 ##
